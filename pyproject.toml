@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lifecase"
+version = "0.2.0"
+description = "Local-first personal life administration agent with evidence-backed workflows."
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "fastapi==0.141.1",
+  "pypdf==6.14.2",
+  "PyYAML==6.0.3",
+  "pydantic==2.13.4",
+  "python-multipart==0.0.32",
+  "tzdata==2026.3",
+  "uvicorn[standard]==0.52.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx==0.28.1",
+  "mypy==2.3.0",
+  "pytest==9.1.1",
+  "ruff==0.15.22",
+]
+packaging = [
+    "pyinstaller==6.19.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["apps/api/src/lifecase"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"packages/case-templates/warranty_claim.v1.yaml" = "lifecase/templates/resources/warranty_claim.v1.yaml"
+"packages/case-templates/return_refund_claim.v1.yaml" = "lifecase/templates/resources/return_refund_claim.v1.yaml"
+"packages/case-templates/expense_reimbursement.v1.yaml" = "lifecase/templates/resources/expense_reimbursement.v1.yaml"
+"packages/case-templates/subscription_cancellation_claim.v1.yaml" = "lifecase/templates/resources/subscription_cancellation_claim.v1.yaml"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["apps/api/src"]
+testpaths = ["apps/api/tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["apps/api/src", "apps/api/tests"]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "apps/api/src"

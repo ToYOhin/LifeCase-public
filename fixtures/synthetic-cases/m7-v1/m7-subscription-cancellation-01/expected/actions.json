@@ -1,0 +1,14 @@
+{
+  "case_id": "m7-subscription-cancellation-01",
+  "items": [
+    {
+      "action_id": "action-m7-subscription-cancellation-01",
+      "blockers": [],
+      "kind": "prepare_communication",
+      "may_execute": false,
+      "requires_approval": true,
+      "risk_level": "C"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_actions.v1"
+}

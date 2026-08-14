@@ -1,0 +1,61 @@
+"""SQLite and content-addressed object storage."""
+
+from lifecase.storage.database import (
+    DatabaseConfigurationError,
+    Fts5UnavailableError,
+    connect_database,
+    require_fts5,
+)
+from lifecase.storage.migrations import (
+    MIGRATIONS,
+    ForeignKeysDisabledError,
+    Migration,
+    MigrationApplyError,
+    MigrationCatalogError,
+    MigrationDriftError,
+    MigrationError,
+    apply_migrations,
+    has_applied_migrations,
+    pending_migrations,
+)
+from lifecase.storage.object_store import (
+    ContentAddressedObjectStore,
+    InvalidSourcePathError,
+    ObjectIntegrityError,
+    ObjectStoreConfig,
+    ObjectStoreError,
+    ObjectWriteError,
+    SourceChangedError,
+    SourceOutsideAllowedRootError,
+    SourceSizeLimitError,
+    StoredObject,
+    UnsupportedMediaTypeError,
+)
+
+__all__ = [
+    "MIGRATIONS",
+    "ContentAddressedObjectStore",
+    "DatabaseConfigurationError",
+    "ForeignKeysDisabledError",
+    "Fts5UnavailableError",
+    "Migration",
+    "MigrationApplyError",
+    "MigrationCatalogError",
+    "MigrationDriftError",
+    "MigrationError",
+    "InvalidSourcePathError",
+    "ObjectIntegrityError",
+    "ObjectStoreConfig",
+    "ObjectStoreError",
+    "ObjectWriteError",
+    "SourceChangedError",
+    "SourceOutsideAllowedRootError",
+    "SourceSizeLimitError",
+    "StoredObject",
+    "UnsupportedMediaTypeError",
+    "apply_migrations",
+    "has_applied_migrations",
+    "pending_migrations",
+    "connect_database",
+    "require_fts5",
+]

@@ -1,0 +1,32 @@
+id: warranty_claim
+version: 1
+title: 商品保修、维修或换新
+goal_options:
+  - repair
+  - replace
+  - refund
+required_claims:
+  - merchant_or_manufacturer
+  - product_name
+  - purchase_date
+  - order_number
+  - desired_outcome
+conditional_claims:
+  - when: manufacturer_requires_serial
+    field: serial_number
+evidence_requirements:
+  - key: purchase_proof
+    description: 能定位购买日期、商品和交易对象的购买凭证
+  - key: defect_description
+    description: 可复现或可理解的故障描述
+  - key: defect_media
+    description: 展示故障或外观状态的图片或视频材料
+close_conditions:
+  - repaired_and_received
+  - replacement_received
+  - refund_received
+  - user_abandoned
+forbidden_actions:
+  - accept_paid_repair_without_confirmation
+  - send_source_documents_without_confirmation
+  - delete_original_evidence

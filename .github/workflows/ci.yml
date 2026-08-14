@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check apps/api
+      - name: Check formatting
+        run: uv run ruff format --check apps/api
+      - name: Type check
+        run: uv run mypy apps/api/src
+      - name: Test
+        run: uv run pytest
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run check:web
+      - name: Test
+        run: npm run test:web
+      - name: Build
+        run: npm run build:web

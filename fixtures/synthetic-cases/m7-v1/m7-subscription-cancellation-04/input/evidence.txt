@@ -1,0 +1,1 @@
+Synthetic administrative record m7-subscription-cancellation-04. Merchant: Synthetic Subscription Organization 04. Amount: CNY 136.99. Event date: 2026-03-27. Reference: Reference unavailable. Desired outcome: Synthetic cancellation outcome 04. This generated material contains no real person, account, address, credential, or payment instrument.

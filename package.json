@@ -1,0 +1,17 @@
+{
+  "name": "lifecase-workspace",
+  "private": true,
+  "version": "0.2.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "test:web": "npm --workspace apps/web run test",
+    "check:web": "npm --workspace apps/web run check"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

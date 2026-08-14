@@ -1,0 +1,1 @@
+Synthetic administrative record m7-subscription-cancellation-01. Merchant: Synthetic Subscription Organization 01. Amount: USD 132.88. Event date: 2026-12-24T09:30:00+08:00. Reference: SYN-SUBSCRIPTION-CANCELLATION-01. Desired outcome: Synthetic cancellation outcome 01. This generated material contains no real person, account, address, credential, or payment instrument.

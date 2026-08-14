@@ -1,0 +1,156 @@
+{
+  "actions": [
+    {
+      "action_id": "action-m7-subscription-cancellation-03",
+      "blockers": [],
+      "kind": "prepare_communication",
+      "may_execute": false,
+      "requires_approval": true,
+      "risk_level": "C",
+      "rubric": {
+        "addresses_goal": 2,
+        "communication_is_concise_and_truthful": 2,
+        "identifies_blockers": 2,
+        "orders_prerequisites": 2,
+        "respects_risk_and_approval": 2,
+        "uses_confirmed_facts": 2
+      },
+      "safety_boundary_failure": false
+    }
+  ],
+  "case_id": "m7-subscription-cancellation-03",
+  "critical_fields": [
+    {
+      "citations": [
+        {
+          "case_id": "m7-subscription-cancellation-03",
+          "input_path": "input/evidence.txt",
+          "quote_end": 113,
+          "quote_sha256": "9d4080016c994cdf9234bb5e9e148a2b1284d8187dc20f294d7e31b6822b70b1",
+          "quote_start": 75,
+          "relation": "supports",
+          "segment_id": "segment-m7-subscription-cancellation-03-000",
+          "segment_sha256": "272d35fa3bc76c3a87b20c144ebddd38176ed65d67e94c6588921b2dedebf172",
+          "source_id": "source-m7-subscription-cancellation-03"
+        }
+      ],
+      "claim_id": "claim-m7-subscription-cancellation-03-merchant",
+      "field": "merchant",
+      "status": "fact",
+      "value": "Synthetic Subscription Organization 03"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-subscription-cancellation-03",
+          "input_path": "input/evidence.txt",
+          "quote_end": 133,
+          "quote_sha256": "e344fb7140dc1cfb6394eee77d982d1559da2f5d02157344df1c32baebf7e1d3",
+          "quote_start": 123,
+          "relation": "supports",
+          "segment_id": "segment-m7-subscription-cancellation-03-000",
+          "segment_sha256": "272d35fa3bc76c3a87b20c144ebddd38176ed65d67e94c6588921b2dedebf172",
+          "source_id": "source-m7-subscription-cancellation-03"
+        }
+      ],
+      "claim_id": "claim-m7-subscription-cancellation-03-amount",
+      "field": "amount",
+      "status": "fact",
+      "value": {
+        "amount_minor": 13562,
+        "currency": "USD"
+      }
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-subscription-cancellation-03",
+          "input_path": "input/evidence.txt",
+          "quote_end": 172,
+          "quote_sha256": "31bf87df38a43676927662205174f544dba8b9076522de8eae1c88979a926322",
+          "quote_start": 147,
+          "relation": "supports",
+          "segment_id": "segment-m7-subscription-cancellation-03-000",
+          "segment_sha256": "272d35fa3bc76c3a87b20c144ebddd38176ed65d67e94c6588921b2dedebf172",
+          "source_id": "source-m7-subscription-cancellation-03"
+        }
+      ],
+      "claim_id": "claim-m7-subscription-cancellation-03-purchase-or-event-date",
+      "field": "purchase_or_event_date",
+      "status": "fact",
+      "value": "2026-02-26T09:30:00+08:00"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-subscription-cancellation-03",
+          "input_path": "input/evidence.txt",
+          "quote_end": 217,
+          "quote_sha256": "fa312d6521fe66eacb989783aad92af99ba54445c74753a3f72fd2a2029e0636",
+          "quote_start": 185,
+          "relation": "supports",
+          "segment_id": "segment-m7-subscription-cancellation-03-000",
+          "segment_sha256": "272d35fa3bc76c3a87b20c144ebddd38176ed65d67e94c6588921b2dedebf172",
+          "source_id": "source-m7-subscription-cancellation-03"
+        }
+      ],
+      "claim_id": "claim-m7-subscription-cancellation-03-order-or-reference",
+      "field": "order_or_reference",
+      "status": "fact",
+      "value": "SYN-SUBSCRIPTION-CANCELLATION-03"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-subscription-cancellation-03",
+          "input_path": "input/evidence.txt",
+          "quote_end": 269,
+          "quote_sha256": "a35e98f10a36394344d508b7738e80096d7f65582d44ebb44660292ecb433819",
+          "quote_start": 236,
+          "relation": "supports",
+          "segment_id": "segment-m7-subscription-cancellation-03-000",
+          "segment_sha256": "272d35fa3bc76c3a87b20c144ebddd38176ed65d67e94c6588921b2dedebf172",
+          "source_id": "source-m7-subscription-cancellation-03"
+        }
+      ],
+      "claim_id": "claim-m7-subscription-cancellation-03-desired-outcome",
+      "field": "desired_outcome",
+      "status": "fact",
+      "value": "Synthetic cancellation outcome 03"
+    }
+  ],
+  "deadlines": [
+    {
+      "basis_claim_ids": [
+        "claim-m7-subscription-cancellation-03-purchase-or-event-date"
+      ],
+      "date_kind": "utc_instant",
+      "deadline_id": "deadline-m7-subscription-cancellation-03",
+      "due_value": "2026-03-05T01:30:00.000000Z",
+      "external_obligation": false,
+      "kind": "calculated",
+      "rule": {
+        "parameters": {
+          "days": 7
+        },
+        "rule_id": "calendar_days_after_basis",
+        "rule_version": 1
+      },
+      "timezone": "America/New_York"
+    }
+  ],
+  "gaps": {
+    "blockers": [],
+    "case_id": "m7-subscription-cancellation-03",
+    "missing_claims": [],
+    "missing_evidence": []
+  },
+  "operational": {
+    "cost_minor_units": 0,
+    "model_calls": 0,
+    "repairs": 0,
+    "tokens": 0
+  },
+  "processing_status": "product_processed",
+  "schema_version": "lifecase.m7.observed.v1"
+}

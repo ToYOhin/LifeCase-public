@@ -1,0 +1,29 @@
+id: expense_reimbursement
+version: 1
+title: 费用报销、补件或结果记录
+goal_options:
+  - submit
+  - resubmit
+  - document_denial
+required_claims:
+  - expense_date
+  - merchant
+  - amount
+  - currency
+  - expense_category
+  - business_purpose
+conditional_claims:
+  - when: policy_requires_preapproval
+    field: approval_reference
+evidence_requirements:
+  - key: receipt
+    description: 能核对商户、日期、金额和币种的收据或发票
+close_conditions:
+  - submitted_and_recorded
+  - reimbursement_received
+  - denial_recorded
+  - user_abandoned
+forbidden_actions:
+  - submit_without_confirmation
+  - alter_original_receipt
+  - send_source_documents_without_confirmation

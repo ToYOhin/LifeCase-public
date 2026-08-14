@@ -1,0 +1,16 @@
+{
+  "case_id": "m7-subscription-cancellation-01",
+  "items": [
+    {
+      "basis_claim_ids": [],
+      "date_kind": "utc_instant",
+      "deadline_id": "deadline-m7-subscription-cancellation-01",
+      "due_value": "2026-12-24T01:30:00.000000Z",
+      "external_obligation": false,
+      "kind": "suggested",
+      "rule": null,
+      "timezone": "Europe/Berlin"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_deadlines.v1"
+}

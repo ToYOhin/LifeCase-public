@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifecase.local/schemas/case/1.0.0",
+  "title": "LifeCase Case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "template_version", "title", "goal", "status", "version"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "type": { "type": "string", "minLength": 1 },
+    "template_version": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "goal": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "status": {
+      "enum": [
+        "intake",
+        "needs_review",
+        "ready",
+        "in_progress",
+        "waiting_external",
+        "blocked",
+        "resolved",
+        "abandoned",
+        "archived"
+      ]
+    },
+    "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "version": { "type": "integer", "minimum": 1 }
+  }
+}

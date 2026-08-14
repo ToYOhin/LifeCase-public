@@ -1,0 +1,30 @@
+id: subscription_cancellation_claim
+version: 1
+title: 订阅取消、停止续费或退款记录
+goal_options:
+  - cancel
+  - stop_renewal
+  - refund
+  - documented_denial
+required_claims:
+  - merchant
+  - amount
+  - purchase_or_event_date
+  - order_or_reference
+  - desired_outcome
+conditional_claims:
+  - when: cancellation_confirmed
+    field: cancellation_confirmation_reference
+evidence_requirements:
+  - key: reference_evidence
+    description: 能定位订阅、订单、账户内交易或取消请求的参考材料
+close_conditions:
+  - cancellation_confirmed
+  - renewal_stopped
+  - refund_received
+  - denial_recorded
+  - user_abandoned
+forbidden_actions:
+  - cancel_without_confirmation
+  - accept_replacement_plan_without_confirmation
+  - send_source_documents_without_confirmation

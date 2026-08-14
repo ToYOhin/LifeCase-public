@@ -1,0 +1,33 @@
+name: Feature slice
+description: Propose one verifiable LifeCase delivery slice
+title: "[Milestone] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: User-observable outcome
+      description: Describe what becomes possible after this slice.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List measurable completion conditions.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Security and scope boundaries
+      description: State external effects, data access, and explicit non-goals.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: List tests and manual checks.
+    validations:
+      required: true

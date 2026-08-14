@@ -1,0 +1,36 @@
+id: return_refund_claim
+version: 1
+title: 商品退货、退款或价差处理
+goal_options:
+  - refund
+  - replacement
+  - price_adjustment
+  - documented_denial
+required_claims:
+  - merchant
+  - item_name
+  - order_number
+  - paid_amount
+  - delivery_date
+  - return_reason
+  - desired_outcome
+conditional_claims:
+  - when: merchant_requires_return_tracking
+    field: return_tracking_number
+evidence_requirements:
+  - key: purchase_proof
+    description: 能定位商品、订单、付款金额和交易对象的购买凭证
+  - key: delivery_proof
+    description: 能核对送达日期或交付状态的材料
+  - key: item_condition
+    description: 能说明商品当前状态和退货原因的文字、图片或视频材料
+close_conditions:
+  - refund_received
+  - replacement_received
+  - price_adjustment_received
+  - denial_recorded
+  - user_abandoned
+forbidden_actions:
+  - ship_return_without_confirmation
+  - accept_store_credit_without_confirmation
+  - send_source_documents_without_confirmation
