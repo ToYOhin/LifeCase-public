@@ -1037,6 +1037,72 @@ VERSIONED_AGENT_RUN_SCHEMA = Migration(
     statements=_versioned_agent_run_schema_statements(),
 )
 
+WARRANTY_PREPARATION_INTENT_SCHEMA = Migration(
+    version=17,
+    name="warranty_preparation_intent",
+    statements=(
+        """
+        CREATE TABLE warranty_preparation_intent (
+            case_id TEXT PRIMARY KEY NOT NULL
+                REFERENCES case_record(id) ON DELETE CASCADE,
+            intent TEXT NOT NULL CHECK (length(intent) <= 2000 AND instr(intent, char(0)) = 0),
+            version INTEGER NOT NULL CHECK (typeof(version) = 'integer' AND version > 0),
+            updated_at TEXT NOT NULL
+        )
+        """,
+    ),
+)
+
+QUESTION_INPUT_BINDING_SCHEMA = Migration(
+    version=18,
+    name="agent_question_input_binding",
+    statements=(
+        """
+        ALTER TABLE agent_run ADD COLUMN input_binding_json TEXT
+            CHECK (input_binding_json IS NULL OR
+                   (typeof(input_binding_json) = 'text' AND
+                    length(CAST(input_binding_json AS BLOB)) BETWEEN 1 AND 100000))
+        """,
+        """
+        ALTER TABLE agent_run ADD COLUMN input_binding_sha256 TEXT
+            CHECK ((input_binding_json IS NULL AND input_binding_sha256 IS NULL) OR
+                   (input_binding_json IS NOT NULL AND input_binding_sha256 IS NOT NULL AND
+                    length(input_binding_sha256) = 64))
+        """,
+    ),
+)
+
+ACTION_PROGRESS_SCHEMA = Migration(
+    version=19,
+    name="human_action_progress",
+    statements=(
+        """
+        CREATE TABLE action_progress (
+            id TEXT PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 200),
+            action_id TEXT NOT NULL,
+            case_id TEXT NOT NULL,
+            position INTEGER NOT NULL CHECK (position >= 0),
+            action_version INTEGER NOT NULL CHECK (action_version > 0),
+            kind TEXT NOT NULL CHECK (kind IN ('progress', 'result')),
+            text TEXT NOT NULL CHECK (
+                length(text) BETWEEN 1 AND 2000 AND instr(text, char(0)) = 0
+                AND length(CAST(text AS BLOB)) <= 8000
+            ),
+            actor TEXT NOT NULL CHECK (length(actor) BETWEEN 1 AND 120),
+            reason TEXT NOT NULL CHECK (length(reason) BETWEEN 1 AND 1000),
+            created_at TEXT NOT NULL,
+            UNIQUE (action_id, position),
+            FOREIGN KEY (action_id, case_id)
+                REFERENCES action(id, case_id) ON DELETE CASCADE,
+            FOREIGN KEY (action_id, action_version)
+                REFERENCES action_event(action_id, new_version) ON DELETE RESTRICT
+        )
+        """,
+        "CREATE INDEX action_progress_case_order_idx "
+        "ON action_progress(case_id, created_at, action_id, position)",
+    ),
+)
+
 MIGRATIONS: tuple[Migration, ...] = (
     INITIAL_SCHEMA,
     EXTRACTION_SCHEMA,
@@ -1054,6 +1120,9 @@ MIGRATIONS: tuple[Migration, ...] = (
     DEEPSEEK_EVALUATION_PROVIDER_SCHEMA,
     GEMINI_ANTHROPIC_PROVIDER_SCHEMA,
     VERSIONED_AGENT_RUN_SCHEMA,
+    WARRANTY_PREPARATION_INTENT_SCHEMA,
+    QUESTION_INPUT_BINDING_SCHEMA,
+    ACTION_PROGRESS_SCHEMA,
 )
 
 _CREATE_MIGRATION_TABLE = """

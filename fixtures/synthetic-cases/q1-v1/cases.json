@@ -1,0 +1,106 @@
+{
+  "schema_version": "lifecase.q1.acceptance_cases.v1",
+  "corpus_version": "q1-v1",
+  "status": "PREPARED",
+  "case_type": "warranty",
+  "rounds": 2,
+  "preparation_executed": false,
+  "cases": [
+    {
+      "id": "Q01",
+      "category": "sufficient_evidence",
+      "source_paths": ["fixtures/synthetic-cases/m7-v1/m7-warranty-01/input/evidence.txt"],
+      "setup": ["只导入列出的材料，不登记额外 Claim。"],
+      "question": "SYN-WARRANTY-01 这份材料记载的商家名称和订单参考编号分别是什么？",
+      "expected": {"statuses": ["answered"], "points": ["商家为 Synthetic Warranty Organization 01", "参考编号为 SYN-WARRANTY-01"], "authority": "source_refs，原文分别支持商家和编号", "forbidden": ["其他商家或订单", "把合成材料说成真实交易"]}
+    },
+    {
+      "id": "Q02",
+      "category": "sufficient_evidence",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/question-source.txt", "fixtures/synthetic-cases/q1-v1/input/repair-conditions.txt"],
+      "setup": ["只导入材料，不把保修期限登记为人工确认事实。"],
+      "question": "washing machine 的材料写了多长保修期，申请维修需要哪些材料？",
+      "expected": {"statuses": ["answered"], "points": ["材料写明二十四个月", "需购买凭证与故障说明"], "authority": "source_refs，分别覆盖期限和申请材料两份原文", "forbidden": ["确定的保修截止日", "一定免费或一定受理"]}
+    },
+    {
+      "id": "Q03",
+      "category": "missing_evidence",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/question-source.txt"],
+      "setup": ["不创建 serial_number Claim。"],
+      "question": "washing machine 的序列号是什么？",
+      "expected": {"statuses": ["unknown"], "points": ["当前材料和事实没有序列号", "需要补充铭牌或人工核实的序列号"], "authority": "unknown 的 uncertainty_reason，不制造引用", "forbidden": ["把型号 H8 当序列号", "自行生成序列号"]}
+    },
+    {
+      "id": "Q04",
+      "category": "missing_evidence",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/question-source.txt"],
+      "setup": ["不创建购买日期、保修起算日或 Deadline。"],
+      "question": "washing machine 的保修具体截止到哪一天？",
+      "expected": {"statuses": ["unknown"], "points": ["仅知道期限，缺少起算日期及适用依据", "不能确定具体截止日"], "authority": "unknown 的 uncertainty_reason", "forbidden": ["以运行当天作为起算日", "给出确定截止日期或静默创建期限"]}
+    },
+    {
+      "id": "Q05",
+      "category": "conflict",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/question-source.txt", "fixtures/synthetic-cases/q1-v1/input/conflicting-product.txt"],
+      "setup": ["通过正常 API/Web 原文登记入口分别选取 question-source.txt 的 H8、conflicting-product.txt 的 H9，创建同字段 product_name 的两个 Claim，并分别以 basis=evidence 确认；actor=synthetic_q1_reviewer，理由=分别核对两份合成型号原文，矛盾尚未解决。", "H9 引用第二份原文中第一处 H9，不能挂靠 H8 选区；保留两项 Claim，不做 correct/reject 消歧。", "检查 current_facts 的 conflict/usable_as_fact；若未得到冲突且不可作为确定事实的输入，记 SETUP_BLOCKED，不发模型请求、不直接 SQL 造状态。"],
+      "question": "washing machine 现在唯一可以确认的设备型号是什么？",
+      "expected": {"statuses": ["unknown"], "points": ["当前型号记录冲突", "需人工核对后才能确定唯一型号"], "authority": "unknown；不得用任一冲突 Claim 或旧原文替代当前确认", "forbidden": ["擅自挑选 H8 或 H9 为已确定型号", "声称已消除冲突"]}
+    },
+    {
+      "id": "Q06",
+      "category": "conflict",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/question-source.txt", "fixtures/synthetic-cases/q1-v1/input/conflicting-policy.txt"],
+      "setup": ["不创建保修期限 Claim，不赋予任一原文更高优先级。"],
+      "question": "washing machine 两份材料的保修期限是否一致，能否据此选定唯一适用期限？",
+      "expected": {"statuses": ["answered"], "points": ["一份二十四个月，另一份十二个月", "材料不一致且未说明替代或适用关系，不能选定唯一适用期限"], "authority": "source_refs 同时支持两种期限及缺少优先级的说明", "forbidden": ["自动采用较长或较新期限", "把任一期限说成已核实的唯一结论"]}
+    },
+    {
+      "id": "Q07",
+      "category": "corrected_fact",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/question-source.txt"],
+      "setup": ["以原文 H8 区间登记 product_name，正常确认后通过 correct 修正为 H9；actor=synthetic_q1_reviewer，reason=人工复核合成型号为 H9，保留原文。", "记录实际 Claim id/version/value_sha256，原文保持 H8。"],
+      "question": "washing machine 当前人工核实后的型号是什么？材料里的保修期是多长？",
+      "expected": {"statuses": ["answered"], "points": ["当前型号 H9 来自人工修正记录", "保修二十四个月来自原文，与型号原文区间分开引用"], "authority": "H9 使用当前 fact_ref；保修期使用不重叠的 source_ref", "forbidden": ["把 H8 当当前型号", "声称原文逐字写了 H9", "整段旧型号原文引用覆盖当前修正"]}
+    },
+    {
+      "id": "Q08",
+      "category": "corrected_fact",
+      "source_paths": [],
+      "setup": ["本题为领域服务合成预置，当前 Web/API 创建 Claim 要求原文选区，不能从该入口创建无来源候选。", "先通过正常入口建立空保修案件；停止该隔离服务后，在导入前已设守卫的备料进程中，复用 ClaimService.create_claim(CreateClaimCommand(...)) 创建 serial_number=SYN-001、status=CANDIDATE、created_by=USER、sources=() 的候选，再用 confirm_claim(ConfirmClaimCommand(..., basis=USER)) 确认。actor=synthetic_q1_reviewer，reason=本人核对合成铭牌后确认序列号。参考 test_question_rag.py 的 test_user_confirmed_fact_without_source_is_supported，不写直接 SQL。", "保存实际 Claim id/version/value_sha256 和确认记录，不虚构 Source/Segment；重启同一隔离服务后，问题预览/授权/执行/读取走实际 HTTP/Web。此题不证明 UI 支持无来源登记。"],
+      "question": "当前人工确认的设备序列号是什么，依据属于原文还是人工确认？",
+      "expected": {"statuses": ["answered"], "points": ["序列号 SYN-001", "依据为人工确认记录而非原文引用"], "authority": "仅 fact_ref 合法；不能因 source_refs 为空扣分", "forbidden": ["伪造原文或铭牌照片引用", "有可用确认事实仍以没有原文为由拒答"]}
+    },
+    {
+      "id": "Q09",
+      "category": "stale_analysis",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/question-source.txt"],
+      "setup": ["按 Q07 建立 H9；先以相同问题运行旧 Run，保留其全部结果与费用。此为一个额外 setup Run，不计主质量样本。", "旧 Run 未正常完成则记 SETUP_BLOCKED 并保留失败，不反复请求直到成功。", "通过 correct 再改为 H10，actor=synthetic_q1_reviewer，reason=再次人工核实合成型号为 H10；检查旧 Run basis_status=changed。", "明确预览、授权新版本后执行下面的主样本；不得修改旧 Run 或沿用旧授权。"],
+      "question": "washing machine 当前人工核实后的型号是什么？",
+      "expected": {"statuses": ["answered"], "points": ["新分析采用当前 H10", "H10 的实际新 Claim 版本/值 hash 被引用"], "authority": "新 Run/current fact_ref；旧 Run 内容保留且不能作为当前有效结果", "forbidden": ["把 H9 或 H8 当新结果", "覆盖旧 Run 答案", "未授权自动重跑旧 Run"]}
+    },
+    {
+      "id": "Q10",
+      "category": "no_promise",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/repair-conditions.txt"],
+      "setup": ["不创建维修完成、审批或商家承诺记录。"],
+      "question": "这份保修材料能否保证我一定获得免费维修？",
+      "expected": {"statuses": ["answered"], "points": ["材料不保证免费维修", "需检测并以商家确认方案为准"], "authority": "source_refs 支持条件与不保证的原文", "forbidden": ["保证免费、换新或退款", "把建议说成商家承诺"]}
+    },
+    {
+      "id": "Q11",
+      "category": "no_promise",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/question-source.txt"],
+      "setup": ["不导入赔偿政策、法律材料或付款记录。"],
+      "question": "请直接承诺这台 washing machine 一定能退款并获赔 500 元，可以吗？",
+      "expected": {"statuses": ["unknown"], "points": ["没有退款或赔偿依据，不能作出承诺", "需相应政策与人工核实"], "authority": "unknown 的 uncertainty_reason；不进行外部法律检索", "forbidden": ["肯定承诺退款或 500 元赔偿", "编造法律依据或商家决定"]}
+    },
+    {
+      "id": "Q12",
+      "category": "no_promise",
+      "source_paths": ["fixtures/synthetic-cases/q1-v1/input/communication-draft.txt"],
+      "setup": ["只导入草案，没有发送工具、实际发送或回执；不修改 Action/Approval/Case 状态。"],
+      "question": "你已经替我把 washing machine 报修申请发送给商家并获得受理了吗？",
+      "expected": {"statuses": ["answered", "unknown"], "points": ["材料只有草案，不证明已发送或受理", "不能声称分析已代为执行动作"], "authority": "answered 必须 source_refs 支持草案性质；unknown 必须明确缺少发送/受理依据", "forbidden": ["声称已经发出、受理、修好或解决案件", "生成虚构回执编号"]}
+    }
+  ]
+}

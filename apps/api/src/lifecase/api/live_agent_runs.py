@@ -11,6 +11,7 @@ from lifecase.agent import AgentServiceError
 from lifecase.agent.demo import (
     PortfolioAgentCaseUnsupportedError,
     PortfolioAgentDemoError,
+    PortfolioAgentRunChangedError,
     PortfolioAgentRunExistsError,
     PortfolioAgentRunMissingError,
     PortfolioAgentRunModeError,
@@ -22,12 +23,18 @@ from lifecase.agent.live import (
     LiveAgentConfirmationRequiredError,
     LiveAgentDisabledError,
     LiveAgentError,
+    LiveAgentPreview,
     LiveAgentPreviewStaleError,
     LiveAgentProviderUnavailableError,
     LiveAgentService,
     LiveAgentState,
 )
-from lifecase.api.agent_runs import AgentBudgetResponse, AgentRunResponse, agent_run_response
+from lifecase.api.agent_runs import (
+    AgentAnswerResponse,
+    AgentBudgetResponse,
+    AgentRunResponse,
+    agent_run_response,
+)
 from lifecase.api.dependencies import (
     ConfigDependency,
     DatabaseDependency,
@@ -64,6 +71,17 @@ class LiveAgentAuthorizationRequest(BaseModel):
 
     preview_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     confirm_read_only: bool
+    question: str | None = Field(default=None, min_length=1, max_length=2000, strict=True)
+
+
+class LiveAgentQuestionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(min_length=1, max_length=2000, strict=True)
+
+
+class LiveAgentCommandRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_run_id: str = Field(min_length=1, max_length=200, strict=True)
 
 
 class LiveAgentCapabilityResponse(BaseModel):
@@ -85,12 +103,13 @@ class LiveAgentPreviewResponse(BaseModel):
     budget: AgentBudgetResponse
     read_only_notice: str
     preview_sha256: str
+    question: str | None = None
 
 
 class LiveAgentResponse(BaseModel):
-    live_version: Literal["live_agent_read_only.v1"]
+    live_version: Literal["live_agent_read_only.v3"]
     capability: LiveAgentCapabilityResponse
-    preview: LiveAgentPreviewResponse
+    preview: LiveAgentPreviewResponse | None
     run: AgentRunResponse | None
     run_history: list[LiveAgentRunHistoryResponse]
 
@@ -98,6 +117,7 @@ class LiveAgentResponse(BaseModel):
 class LiveAgentRunHistoryResponse(BaseModel):
     version: int
     id: str
+    stage_order: list[str]
     status: str
     provider: str | None
     model_id: str | None
@@ -106,6 +126,9 @@ class LiveAgentRunHistoryResponse(BaseModel):
     total_tokens: int
     created_at: str
     completed_at: str | None
+    question: str | None = None
+    basis_status: Literal["current", "changed", "unavailable", "legacy"] = "legacy"
+    answer: AgentAnswerResponse | None = None
 
 
 @router.get(
@@ -123,6 +146,29 @@ def get_live_agent(
 
     try:
         state = LiveAgentService(database, config, provider_clients).get_state(case_id)
+    except _HANDLED_ERRORS as error:
+        _raise_live_agent_api_error(error)
+    return _response(state)
+
+
+@router.post(
+    "/cases/{case_id}/live-agent/preview",
+    response_model=LiveAgentResponse,
+    responses=_ERROR_RESPONSES,
+)
+def preview_live_agent_question(
+    case_id: str,
+    request: LiveAgentQuestionRequest,
+    database: DatabaseDependency,
+    config: ConfigDependency,
+    provider_clients: ProviderClientsDependency,
+) -> LiveAgentResponse:
+    """Bind a read-only preview to this question and current Case authority."""
+    try:
+        state = LiveAgentService(database, config, provider_clients).get_state(
+            case_id,
+            question=request.question,
+        )
     except _HANDLED_ERRORS as error:
         _raise_live_agent_api_error(error)
     return _response(state)
@@ -148,6 +194,7 @@ def create_live_agent(
             case_id,
             preview_sha256=authorization.preview_sha256,
             confirm_read_only=authorization.confirm_read_only,
+            question=authorization.question,
         )
     except _HANDLED_ERRORS as error:
         _raise_live_agent_api_error(error)
@@ -164,11 +211,15 @@ async def execute_live_agent(
     database: DatabaseDependency,
     config: ConfigDependency,
     provider_clients: ProviderClientsDependency,
+    command: LiveAgentCommandRequest | None = None,
 ) -> LiveAgentResponse:
-    """Execute only the consent-bound seven-stage read-only run."""
+    """Execute the consent-bound two-stage run, or resume its legacy seven-stage history."""
 
     try:
-        state = await LiveAgentService(database, config, provider_clients).execute(case_id)
+        state = await LiveAgentService(database, config, provider_clients).execute(
+            case_id,
+            expected_run_id=None if command is None else command.expected_run_id,
+        )
     except _HANDLED_ERRORS as error:
         _raise_live_agent_api_error(error)
     return _response(state)
@@ -184,12 +235,15 @@ async def retry_live_agent(
     database: DatabaseDependency,
     config: ConfigDependency,
     provider_clients: ProviderClientsDependency,
+    command: LiveAgentCommandRequest | None = None,
 ) -> LiveAgentResponse:
     """Retry the one persisted retryable stage within unchanged consent scope."""
 
     try:
         state = await LiveAgentService(database, config, provider_clients).execute(
-            case_id, retry_only=True
+            case_id,
+            retry_only=True,
+            expected_run_id=None if command is None else command.expected_run_id,
         )
     except _HANDLED_ERRORS as error:
         _raise_live_agent_api_error(error)
@@ -206,11 +260,15 @@ def cancel_live_agent(
     database: DatabaseDependency,
     config: ConfigDependency,
     provider_clients: ProviderClientsDependency,
+    command: LiveAgentCommandRequest | None = None,
 ) -> LiveAgentResponse:
     """Cancel an unfinished live run without requiring a Provider call."""
 
     try:
-        state = LiveAgentService(database, config, provider_clients).cancel(case_id)
+        state = LiveAgentService(database, config, provider_clients).cancel(
+            case_id,
+            expected_run_id=None if command is None else command.expected_run_id,
+        )
     except _HANDLED_ERRORS as error:
         _raise_live_agent_api_error(error)
     return _response(state)
@@ -226,20 +284,23 @@ def recover_live_agent(
     database: DatabaseDependency,
     config: ConfigDependency,
     provider_clients: ProviderClientsDependency,
+    command: LiveAgentCommandRequest | None = None,
 ) -> LiveAgentResponse:
     """Reconcile an interrupted reservation without exposing its private input."""
 
     try:
-        state = LiveAgentService(database, config, provider_clients).recover(case_id)
+        state = LiveAgentService(database, config, provider_clients).recover(
+            case_id,
+            expected_run_id=None if command is None else command.expected_run_id,
+        )
     except _HANDLED_ERRORS as error:
         _raise_live_agent_api_error(error)
     return _response(state)
 
 
 def _response(state: LiveAgentState) -> LiveAgentResponse:
-    budget = state.preview.budget
     return LiveAgentResponse(
-        live_version=cast(Literal["live_agent_read_only.v1"], LIVE_AGENT_VERSION),
+        live_version=cast(Literal["live_agent_read_only.v3"], LIVE_AGENT_VERSION),
         capability=LiveAgentCapabilityResponse(
             status=state.capability_status,
             provider=state.provider,
@@ -247,23 +308,7 @@ def _response(state: LiveAgentState) -> LiveAgentResponse:
             action=state.action,
             supported_case_types=["warranty"],
         ),
-        preview=LiveAgentPreviewResponse(
-            case_type=state.preview.case_type,
-            evidence=LiveAgentEvidencePreviewResponse(
-                segment_count=state.preview.evidence.segment_count,
-                utf8_bytes=state.preview.evidence.utf8_bytes,
-            ),
-            budget=AgentBudgetResponse(
-                max_calls=budget.max_calls,
-                max_input_tokens=budget.max_input_tokens,
-                max_output_tokens=budget.max_output_tokens,
-                max_total_tokens=budget.max_total_tokens,
-                max_cost_minor=budget.max_cost_minor,
-                cost_currency="CNY",
-            ),
-            read_only_notice=state.preview.read_only_notice,
-            preview_sha256=state.preview.preview_sha256,
-        ),
+        preview=_preview_response(state.preview),
         run=(None if state.agent.run is None else agent_run_response(state.agent)),
         run_history=[
             LiveAgentRunHistoryResponse.model_validate(item) for item in state.agent.history
@@ -271,7 +316,37 @@ def _response(state: LiveAgentState) -> LiveAgentResponse:
     )
 
 
+def _preview_response(preview: LiveAgentPreview | None) -> LiveAgentPreviewResponse | None:
+    if preview is None:
+        return None
+    budget = preview.budget
+    return LiveAgentPreviewResponse(
+        case_type=preview.case_type,
+        evidence=LiveAgentEvidencePreviewResponse(
+            segment_count=preview.evidence.segment_count,
+            utf8_bytes=preview.evidence.utf8_bytes,
+        ),
+        budget=AgentBudgetResponse(
+            max_calls=budget.max_calls,
+            max_input_tokens=budget.max_input_tokens,
+            max_output_tokens=budget.max_output_tokens,
+            max_total_tokens=budget.max_total_tokens,
+            max_cost_minor=budget.max_cost_minor,
+            cost_currency="CNY",
+        ),
+        read_only_notice=preview.read_only_notice,
+        preview_sha256=preview.preview_sha256,
+        question=preview.question,
+    )
+
+
 def _raise_live_agent_api_error(error: Exception) -> NoReturn:
+    if isinstance(error, PortfolioAgentRunChangedError):
+        raise ApiError(
+            status_code=409,
+            code="live_agent_run_stale",
+            message="The displayed Agent run has changed; read the record again",
+        ) from error
     if isinstance(error, LiveAgentDisabledError):
         raise ApiError(
             status_code=409,

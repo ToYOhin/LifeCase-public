@@ -1,0 +1,8 @@
+schema_version: lifecase.m7.synthetic_case.v1
+case_id: m7-travel-logistics-02
+case_type: travel_logistics
+support_level: evaluation_only
+title: Synthetic travel logistics evaluation m7-travel-logistics-02
+goal: Record a deterministic synthetic travel logistics outcome
+input_files:
+  - input/evidence.txt

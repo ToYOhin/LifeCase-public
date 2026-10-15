@@ -10,6 +10,7 @@ from lifecase.actions import (
     ActionService,
     ActionServiceError,
 )
+from lifecase.actions.progress import ActionProgressService
 from lifecase.agent.models import AgentRunStatus, AgentStageName, AgentStageStatus
 from lifecase.approvals import (
     ApprovalEventType,
@@ -160,6 +161,7 @@ class TimelineService:
             *self._agent_events(case.id),
             *self._deadline_events(case.id),
             *self._action_events(case.id),
+            *self._action_progress_events(case.id),
             *self._approval_events(case.id),
         ]
         events.sort(key=_event_order)
@@ -482,6 +484,26 @@ class TimelineService:
                     )
                 )
         return events
+
+    def _action_progress_events(self, case_id: str) -> list[TimelineEvent]:
+        return [
+            _event(
+                case_id=case_id,
+                kind=TimelineEventKind.ACTION_PROGRESS_RECORDED,
+                occurred_at=_validated_timestamp(item.created_at),
+                authority_type=TimelineAuthorityType.ACTION_PROGRESS,
+                authority_id=item.id,
+                subject_id=item.action_id,
+                origin=TimelineOrigin.RECORDED_ACTOR,
+                actor=item.actor,
+                label=item.kind,
+                version=item.action_version,
+                reason=item.reason,
+            )
+            for item in ActionProgressService(self._connection).list_case_entries_in_transaction(
+                case_id
+            )
+        ]
 
 
 def _event(

@@ -1,0 +1,8 @@
+schema_version: lifecase.m7.synthetic_case.v1
+case_id: m7-return-refund-02
+case_type: return_refund
+support_level: reviewed_template
+title: Synthetic return refund evaluation m7-return-refund-02
+goal: Record a deterministic synthetic return refund outcome
+input_files:
+  - input/evidence.txt

@@ -15,6 +15,12 @@ coverage/
 /output/
 .playwright-cli/
 
+# Local AI development coordination (never publish)
+/AGENTS.md
+/.github/copilot-instructions.md
+/docs/HANDOFF.md
+/docs/NEXT_PROMPT.md
+
 # Secrets and local runtime data
 .env
 .env.*

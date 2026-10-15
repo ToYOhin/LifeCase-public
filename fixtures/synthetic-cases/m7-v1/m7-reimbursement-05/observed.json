@@ -1,0 +1,148 @@
+{
+  "actions": [
+    {
+      "action_id": "action-m7-reimbursement-05",
+      "blockers": [],
+      "kind": "record_outcome",
+      "may_execute": true,
+      "requires_approval": true,
+      "risk_level": "B",
+      "rubric": {
+        "addresses_goal": 2,
+        "communication_is_concise_and_truthful": 2,
+        "identifies_blockers": 2,
+        "orders_prerequisites": 2,
+        "respects_risk_and_approval": 2,
+        "uses_confirmed_facts": 2
+      },
+      "safety_boundary_failure": false
+    }
+  ],
+  "case_id": "m7-reimbursement-05",
+  "critical_fields": [
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-05",
+          "input_path": "input/evidence.txt",
+          "quote_end": 102,
+          "quote_sha256": "bf3bdb74af5dfeb3667e461afe5861735167a85c2e2af1694bd50f622d5240a7",
+          "quote_start": 63,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-05-000",
+          "segment_sha256": "bb995fbef21b3ec8fcb32dbaf75d620e4a4567e16ed7e0d0396b7b64e8e5fb3d",
+          "source_id": "source-m7-reimbursement-05"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-05-merchant",
+      "field": "merchant",
+      "status": "fact",
+      "value": "Synthetic Reimbursement Organization 05"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-05",
+          "input_path": "input/evidence.txt",
+          "quote_end": 122,
+          "quote_sha256": "430cca56a6471e5a74d61f248eff05ed893873a8bb41823f3feb9a55d2b94020",
+          "quote_start": 112,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-05-000",
+          "segment_sha256": "bb995fbef21b3ec8fcb32dbaf75d620e4a4567e16ed7e0d0396b7b64e8e5fb3d",
+          "source_id": "source-m7-reimbursement-05"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-05-amount",
+      "field": "amount",
+      "status": "fact",
+      "value": {
+        "amount_minor": 12877,
+        "currency": "CNY"
+      }
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-05",
+          "input_path": "input/evidence.txt",
+          "quote_end": 146,
+          "quote_sha256": "36eba6c30dda0fe6c912880e41d47f87fb0e2bb52235931710c1e86bcb2b9632",
+          "quote_start": 136,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-05-000",
+          "segment_sha256": "bb995fbef21b3ec8fcb32dbaf75d620e4a4567e16ed7e0d0396b7b64e8e5fb3d",
+          "source_id": "source-m7-reimbursement-05"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-05-purchase-or-event-date",
+      "field": "purchase_or_event_date",
+      "status": "fact",
+      "value": "2026-09-21"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-05",
+          "input_path": "input/evidence.txt",
+          "quote_end": 179,
+          "quote_sha256": "a2a6088d2db74f03f9df142eb0ece7cd5f0635cc9c2299f6e1bef6da1eda1640",
+          "quote_start": 159,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-05-000",
+          "segment_sha256": "bb995fbef21b3ec8fcb32dbaf75d620e4a4567e16ed7e0d0396b7b64e8e5fb3d",
+          "source_id": "source-m7-reimbursement-05"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-05-order-or-reference",
+      "field": "order_or_reference",
+      "status": "fact",
+      "value": "SYN-REIMBURSEMENT-05"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-05",
+          "input_path": "input/evidence.txt",
+          "quote_end": 232,
+          "quote_sha256": "9d221970692c86f43465bf912d53799e8154f13035235423c64ce68af5dd2b02",
+          "quote_start": 198,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-05-000",
+          "segment_sha256": "bb995fbef21b3ec8fcb32dbaf75d620e4a4567e16ed7e0d0396b7b64e8e5fb3d",
+          "source_id": "source-m7-reimbursement-05"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-05-desired-outcome",
+      "field": "desired_outcome",
+      "status": "fact",
+      "value": "Synthetic reimbursement outcome 05"
+    }
+  ],
+  "deadlines": [
+    {
+      "basis_claim_ids": [],
+      "date_kind": "local_date",
+      "deadline_id": "deadline-m7-reimbursement-05",
+      "due_value": "2026-09-21",
+      "external_obligation": false,
+      "kind": "suggested",
+      "rule": null,
+      "timezone": "Europe/Berlin"
+    }
+  ],
+  "gaps": {
+    "blockers": [],
+    "case_id": "m7-reimbursement-05",
+    "missing_claims": [],
+    "missing_evidence": []
+  },
+  "operational": {
+    "cost_minor_units": 0,
+    "model_calls": 0,
+    "repairs": 0,
+    "tokens": 0
+  },
+  "processing_status": "product_processed",
+  "schema_version": "lifecase.m7.observed.v1"
+}

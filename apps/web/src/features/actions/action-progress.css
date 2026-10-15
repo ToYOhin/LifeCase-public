@@ -1,0 +1,26 @@
+.action-progress { display: grid; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #c5c8bc; min-width: 0; }
+.action-progress h3, .action-progress h4, .action-progress p { margin: 0; }
+.action-progress-details > summary { cursor: pointer; font-weight: 650; padding: 4px 0; }
+.action-progress-body { display: grid; gap: 12px; padding-top: 14px; }
+.action-progress label { display: grid; gap: 6px; font-weight: 650; min-width: 0; }
+.action-progress input:not([type="checkbox"]), .action-progress select, .action-progress textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 9px; border: 1px solid #87968b; border-radius: 5px; color: inherit; background: #fffdf7; font: inherit; }
+.action-progress textarea { resize: vertical; }
+.action-progress button { justify-self: start; max-width: 100%; white-space: normal; }
+.action-progress .action-progress-check { display: flex; align-items: flex-start; gap: 8px; font-weight: 500; }
+.action-progress-check input { margin-top: 4px; flex: 0 0 auto; }
+.action-progress-history { display: grid; gap: 14px; padding-left: 22px; margin: 0; }
+.action-progress-history li { display: grid; gap: 4px; }
+.action-progress-text, .action-completion-source p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.action-progress code, .action-progress small { overflow-wrap: anywhere; }
+.action-completion-review { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid #c5c8bc; }
+.action-completion-source { max-height: 340px; overflow: auto; padding: 10px; border: 1px solid #c5c8bc; background: #fffdf7; }
+.action-completion-source blockquote { margin: 10px 0; }
+.action-follow-up, .action-cancellation-form { display: grid; gap: 12px; min-width: 0; }
+.action-follow-up { margin-top: 16px; padding-top: 14px; border-top: 1px solid #c5c8bc; }
+.action-follow-up p { margin: 0; overflow-wrap: anywhere; }
+.action-follow-up button { justify-self: start; max-width: 100%; white-space: normal; }
+.action-follow-up summary { cursor: pointer; font-weight: 650; padding: 8px 0; }
+.action-cancellation-form label { display: grid; gap: 6px; font-weight: 650; }
+.action-cancellation-form input:not([type="checkbox"]), .action-cancellation-form textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 9px; border: 1px solid #87968b; border-radius: 5px; color: inherit; background: #fffdf7; font: inherit; }
+.action-cancellation-form textarea { resize: vertical; }
+.action-cancellation-form .action-progress-check { display: flex; align-items: flex-start; gap: 8px; font-weight: 500; }

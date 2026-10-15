@@ -7,6 +7,15 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from lifecase.api.dependencies import DatabaseDependency
 from lifecase.api.errors import ApiError
+from lifecase.cases.preparation import (
+    DesiredOutcomeConflictError,
+    PreparationIntentCaseNotFoundError,
+    PreparationIntentPersistenceError,
+    PreparationIntentService,
+    PreparationIntentUnsupportedError,
+    PreparationIntentValidationError,
+    PreparationIntentVersionConflictError,
+)
 from lifecase.cases.service import CaseNotFoundError, CaseServiceError
 from lifecase.claims.manual_service import ManualClaimService, ManualClaimValidationError
 from lifecase.claims.models import (
@@ -73,6 +82,16 @@ class ManualClaimRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
+class DesiredOutcomeRequest(BaseModel):
+    """Register the exact saved intent version without accepting a replacement value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_intent_version: int = Field(gt=0, strict=True)
+    actor: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=1, max_length=1000)
+
+
 class ClaimResponse(BaseModel):
     """Durable authoritative Claim projection."""
 
@@ -87,6 +106,58 @@ class ClaimResponse(BaseModel):
     version: int
     created_at: str
     updated_at: str
+
+
+@case_router.post(
+    "/cases/{case_id}/desired-outcome",
+    response_model=ClaimResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_desired_outcome(
+    case_id: str,
+    payload: DesiredOutcomeRequest,
+    database: DatabaseDependency,
+) -> ClaimResponse:
+    """Create a user candidate from saved intent; confirmation is a separate command."""
+
+    try:
+        record = PreparationIntentService(database).create_desired_outcome_candidate(
+            case_id,
+            expected_intent_version=payload.expected_intent_version,
+            actor=payload.actor,
+            reason=payload.reason,
+        )
+    except PreparationIntentCaseNotFoundError as error:
+        raise ApiError(
+            status_code=404, code="case_not_found", message="Case was not found"
+        ) from error
+    except PreparationIntentVersionConflictError as error:
+        raise ApiError(
+            status_code=409,
+            code="preparation_intent_version_conflict",
+            message="Preparation intent has changed; reload before registering it",
+            details={"current_version": error.current_version},
+        ) from error
+    except DesiredOutcomeConflictError as error:
+        raise ApiError(
+            status_code=409,
+            code="desired_outcome_conflict",
+            message="An existing desired outcome must be reviewed before registering another",
+        ) from error
+    except (PreparationIntentUnsupportedError, PreparationIntentValidationError) as error:
+        raise ApiError(
+            status_code=422, code="claim_invalid", message="Claim request is invalid"
+        ) from error
+    except PreparationIntentPersistenceError as error:
+        raise ApiError(
+            status_code=503,
+            code="claim_storage_failed",
+            message="Claim operation could not be completed",
+            retryable=True,
+        ) from error
+    except (ClaimCommandValidationError, ClaimServiceError) as error:
+        _raise_claim_api_error(error)
+    return _claim_response(record)
 
 
 @case_router.post(

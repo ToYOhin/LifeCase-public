@@ -1,0 +1,23 @@
+.current-facts { min-width: 0; margin-bottom: 24px; padding: clamp(18px, 3vw, 30px); border: 1px solid #abb9ab; border-radius: 16px; background: #fafaf4; color: #263e32; }
+.current-facts h2 { margin: 0 0 10px; font-size: 1.35rem; }
+.current-facts p { line-height: 1.65; overflow-wrap: anywhere; }
+.current-facts-heading, .current-fact-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.current-facts-heading > div { min-width: 0; }
+.current-facts button { padding: 10px 14px; min-height: 42px; border: 1px solid #426650; border-radius: 7px; color: #2d523c; background: #f4f7ef; }
+.current-facts button:disabled { opacity: .55; cursor: default; }
+.current-facts-heading > button { flex-shrink: 0; }
+.current-facts-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.current-facts-list article { min-width: 0; padding: 16px; border: 1px solid #d1d8ce; border-radius: 8px; background: #fffef9; overflow-wrap: anywhere; }
+.current-facts-list article.is-targeted { border: 2px solid #426650; }
+.current-fact-heading h3 { margin: 0; font-size: 1rem; }
+.current-fact-heading span { flex-shrink: 0; font-size: .8rem; }
+.current-fact-value { font-weight: 700; white-space: pre-wrap; }
+.current-fact-warning, .current-facts [role="alert"] { color: #813929; }
+.current-fact-editor { margin-top: 20px; padding: 20px; border: 2px solid #799b70; border-radius: 8px; background: #fffef9; }
+.current-fact-editor label { display: grid; gap: 8px; margin-top: 14px; font-weight: 700; }
+.current-fact-editor input, .current-fact-editor textarea { min-width: 0; width: 100%; padding: 11px; border: 1px solid #aab8ac; border-radius: 6px; background: white; color: #253c30; }
+.current-fact-editor textarea { resize: vertical; }
+.current-fact-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.current-fact-actions button[type="submit"] { background: #28523a; color: white; }
+.current-facts summary { cursor: pointer; }
+@media (max-width: 700px) { .current-facts-heading { flex-direction: column; } .current-facts-list { grid-template-columns: 1fr; } .current-fact-editor { padding: 14px; } }

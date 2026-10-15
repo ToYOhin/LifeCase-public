@@ -1,40 +1,45 @@
 # Windows Installer
 
-LifeCase 提供两个独立的 Windows 可执行文件：
+Updated: 2026-10-15. This public repository currently provides source only, with no Release or downloadable installer. The packaging code remains available; the release evidence below belongs to the original private source repository.
 
-- `LifeCaseSetup.exe`：当前用户安装器；
-- `LifeCase.exe`：安装后的应用启动器。
+## What the installer provides
 
-安装器无需管理员权限，默认安装到 `%LOCALAPPDATA%\Programs\LifeCase`，创建桌面和开始菜单快捷方式，并登记到“应用和功能”。启动器初始化用户数据目录、启动单一 loopback API/Web 服务并打开浏览器。卸载默认保留 `%LOCALAPPDATA%\LifeCase`。
+`LifeCaseSetup.exe` is an unsigned, per-user Windows installer for the existing local daily-use application. It requires no administrator rights and installs the self-contained program to `%LOCALAPPDATA%\Programs\LifeCase`. The installed target does not require a source checkout, Python, uv, Node or npm.
 
-## 构建
+The installer creates Start Menu and Desktop shortcuts and a current-user Apps & Features entry. `LifeCase.exe` initializes `%LOCALAPPDATA%\LifeCase` when needed, starts one loopback-only API/Web process, verifies readiness and opens the browser. The default Provider remains disabled.
 
-先构建自包含应用：
+Uninstall removes the owned program directory, shortcuts and uninstall registration. It intentionally preserves `%LOCALAPPDATA%\LifeCase`, including the SQLite database, sources, exports and backups. Data deletion remains an explicit separate user action.
 
-```powershell
-.\scripts\build-windows-app.ps1
-```
+## Current limits
 
-再构建安装器：
+- The original private source repository's [v0.2.0 Release](https://github.com/ToYOhin/LifeCase/releases/tag/v0.2.0) contains `LifeCaseSetup.exe` and `SHA256SUMS.txt` and requires access permission. It is not a Release of this public repository. Generated binaries are not tracked source files.
+- The published asset corresponds to tag commit `e7ce75c`, not later mainline changes. New source behavior needs a separately built and verified asset; it does not update installed copies automatically.
+- They are not code-signed, so Windows SmartScreen may show an unknown-publisher warning.
+- This is not MSI, portable mode, a native desktop UI, auto-update, a Windows service, multi-user hosting or production-readiness evidence.
+- Package acceptance is separate from exact-SHA CI, the annotated tag, formal Release, 27/30 evaluation evidence and dogfood `NOT_RUN`.
 
-```powershell
-.\scripts\build-windows-installer.ps1 -ApplicationRoot <app-dist-directory>
-```
+## Low-resource build
 
-脚本使用项目锁定依赖和 PyInstaller 打包，不改变 API、Provider 默认值或业务行为。构建产物不应提交到 Git；正式分发时应同时发布 SHA-256 校验文件。
-
-## 验收
+The build scripts set Idle process priority and, when available, restrict themselves and child processes to two logical processors. Artifacts must be written outside the repository.
 
 ```powershell
-.\scripts\test-windows-installer.ps1 -SetupExe <LifeCaseSetup.exe>
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-installer.ps1 -OutputRoot "$env:TEMP\LifeCase-v0.2.0-windows"
 ```
 
-验收覆盖安装、快捷方式、启动、健康检查、Web 响应、停止、卸载和默认数据保留。测试使用隔离的当前用户目录，不需要管理员权限。
+This serially restores locked dependencies, builds the Web client and application directory, then packages `LifeCaseSetup.exe`. PyInstaller is pinned only in the `packaging` dependency group and is not part of the application runtime dependency set.
 
-## 安全边界
+For a prebuilt application directory, the installer-only build can reuse it:
 
-- 安装器和启动器只接受受控的应用与数据目录；
-- 服务只监听 loopback；
-- 应用目录与可变用户数据分离；
-- 卸载不会静默删除用户数据；
-- 未签名构建可能触发 Windows SmartScreen“未知发布者”提示。
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows-installer.ps1 -OutputRoot "$env:TEMP\LifeCase-v0.2.0-windows" -ApplicationRoot "$env:TEMP\LifeCase-app\app-dist\LifeCase" -SkipDependencySync
+```
+
+## Acceptance
+
+The installer acceptance requires an unused LifeCase Start Menu/Desktop/uninstall-registration boundary and a new isolated data root. It fails before mutation if those boundaries are already occupied.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-windows-installer.ps1 -SetupExe "$env:TEMP\LifeCase-v0.2.0-windows\LifeCaseSetup.exe" -DataRoot "$env:TEMP\LifeCase-v0.2.0-windows\acceptance-data"
+```
+
+The check installs to a random direct child of `%LOCALAPPDATA%\Programs`, verifies installed files, shortcuts and Apps & Features registration, starts the installed application against the isolated data root, checks API health and Web HTTP 200, stops it, invokes the installed uninstaller, confirms integration removal and confirms that the SQLite database remains.

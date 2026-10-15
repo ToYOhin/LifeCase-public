@@ -1,0 +1,74 @@
+{
+  "schema": "lifecase.offline-demo-materials.v1",
+  "synthetic": true,
+  "origin": "Reused fixed four-case Chinese values from the 2026-10-01 page-check preparation; no old script executed.",
+  "cases": [
+    {
+      "type": "warranty",
+      "template_id": "warranty_claim",
+      "title": "合成保修演示",
+      "goal": "核实材料并准备维修沟通，不发送外部内容",
+      "fields": {
+        "merchant_or_manufacturer": "合成售后商户",
+        "product_name": "合成H8",
+        "purchase_date": "2026-09-01",
+        "order_number": "SYN-WORDER",
+        "desired_outcome": "合成请求维修",
+        "purchase_proof": "合成购买凭证说明",
+        "defect_description": "合成故障说明",
+        "defect_media": "合成图片文字说明，不解析媒体",
+        "serial_number": "SYN-W01"
+      }
+    },
+    {
+      "type": "return_refund",
+      "template_id": "return_refund_claim",
+      "title": "合成退款演示",
+      "goal": "核实退货材料并准备退款请求，不承诺退款到账",
+      "fields": {
+        "merchant": "合成商户A",
+        "item_name": "合成退货商品",
+        "order_number": "SYN-RORDER",
+        "paid_amount": 200,
+        "delivery_date": "2026-09-01",
+        "return_reason": "合成商品损坏",
+        "desired_outcome": "合成请求退款",
+        "purchase_proof": "合成付款凭证说明",
+        "delivery_proof": "合成送达凭证说明",
+        "item_condition": "合成商品状态说明",
+        "return_tracking_number": "SYN-R01"
+      }
+    },
+    {
+      "type": "reimbursement",
+      "template_id": "expense_reimbursement",
+      "title": "合成报销演示",
+      "goal": "核实费用并登记本地跟进，不提交报销或承诺到账",
+      "fields": {
+        "expense_date": "2026-09-01",
+        "merchant": "合成报销商户",
+        "amount": 200,
+        "currency": "CNY",
+        "expense_category": "合成交通费",
+        "business_purpose": "合成业务拜访",
+        "receipt": "合成发票说明",
+        "approval_reference": "SYN-E01"
+      }
+    },
+    {
+      "type": "subscription_cancellation",
+      "template_id": "subscription_cancellation_claim",
+      "title": "合成订阅取消演示",
+      "goal": "核实订阅并记录停止续费请求，不实际取消或承诺成功",
+      "fields": {
+        "merchant": "合成订阅商户",
+        "amount": 200,
+        "purchase_or_event_date": "2026-09-01",
+        "order_or_reference": "SYN-S01",
+        "desired_outcome": "合成停止续费",
+        "reference_evidence": "合成订阅参考说明",
+        "cancellation_confirmation_reference": "SYN-C01"
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "case_id": "m7-travel-logistics-03",
+  "items": [
+    {
+      "action_id": "action-m7-travel-logistics-03",
+      "blockers": [],
+      "kind": "follow_up",
+      "may_execute": false,
+      "requires_approval": true,
+      "risk_level": "C"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_actions.v1"
+}

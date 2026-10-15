@@ -28,7 +28,6 @@ export function CaseDocket(props: CaseDocketProps) {
       <details className="case-switcher">
         <summary>
           <strong>切换案件（{props.cases.length}）</strong>
-          <span>按需打开本地案件台账</span>
         </summary>
         <DocketBody {...props} compact />
       </details>
@@ -39,9 +38,7 @@ export function CaseDocket(props: CaseDocketProps) {
     <section className="workbench" aria-labelledby="workbench-title">
       <div className="workbench-head">
         <div>
-          <p className="section-label">TODAY DOCKET</p>
           <h2 id="workbench-title">今日案件台账</h2>
-          <p>按优先级、最近权威活动和已登记行动排序；截止风险仍未计算。</p>
         </div>
         <button
           className="refresh-action"
@@ -74,7 +71,7 @@ function DocketBody({
       <DocketState
         mark="···"
         title="正在读取本地案件"
-        detail="只读取 SQLite 摘要，不发送网络请求。"
+        detail="正在读取案件记录。"
         role="status"
       />
     );
@@ -94,8 +91,8 @@ function DocketBody({
     return (
       <DocketState
         mark="OFF"
-        title="本地 API 未连接"
-        detail="确认 API 已启动后重试；现有数据没有改变。"
+        title="本机服务未连接"
+        detail="请启动本机服务后重试；现有数据没有改变。"
         role="alert"
       >
         <button type="button" onClick={onRefresh}>重新连接</button>
@@ -107,7 +104,7 @@ function DocketBody({
       <DocketState
         mark="ERR"
         title="案件台账暂时无法读取"
-        detail="本地服务返回安全错误，可稍后重试。"
+        detail="暂时无法读取，请稍后重试。"
         role="alert"
       >
         <button type="button" onClick={onRefresh}>重试读取</button>
@@ -122,7 +119,6 @@ function DocketBody({
           <span><strong>{String(todayCases.length).padStart(2, "0")}</strong> 今日案件</span>
           <span><strong>{todayCases.reduce((sum, item) => sum + item.missing_evidence.total, 0)}</strong> 条材料缺口</span>
           <span><strong>{todayCases.filter((item) => item.next_action).length}</strong> 个下一行动</span>
-          <span><strong>—</strong> 截止风险未计算</span>
         </div>
       )}
       {todayCases.length > 0 ? (

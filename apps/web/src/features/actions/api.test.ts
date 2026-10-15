@@ -9,7 +9,7 @@ import {
   getApprovals,
   requestActionApproval,
 } from "./api";
-import { actionKindLabel, actionStatusLabel, actionView } from "./presenters";
+import { actionKindLabel, actionStatusLabel, actionView, canAdvanceAnalysisAction } from "./presenters";
 import type { ActionRecord } from "./types";
 
 const action: ActionRecord = {
@@ -47,6 +47,14 @@ const action: ActionRecord = {
 };
 
 describe("Action API", () => {
+  it("does not advance saved analysis drafts whose basis changed or cannot be checked", () => {
+    expect(canAdvanceAnalysisAction(action)).toBe(true);
+    for (const analysis_basis_status of ["changed", "unavailable"] as const) {
+      expect(canAdvanceAnalysisAction({ ...action, analysis_basis_status })).toBe(false);
+    }
+    expect(canAdvanceAnalysisAction({ ...action, analysis_basis_status: "current" })).toBe(true);
+    expect(canAdvanceAnalysisAction({ ...action, payload: { ...action.payload, analysis_run_id: "portfolio-live-q1-one" } })).toBe(false);
+  });
   it("loads the encoded Case route and retains authority fields", async () => {
     const calls: string[] = [];
     const result = await getActions("case synthetic", async (input) => {

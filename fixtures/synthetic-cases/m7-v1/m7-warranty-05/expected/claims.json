@@ -1,0 +1,44 @@
+{
+  "case_id": "m7-warranty-05",
+  "critical_fields": [
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-warranty-05-merchant",
+      "expected_value": "Synthetic Warranty Organization 05",
+      "field": "merchant"
+    },
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-warranty-05-amount",
+      "expected_value": {
+        "amount_minor": 11781,
+        "currency": "CNY"
+      },
+      "field": "amount"
+    },
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-warranty-05-purchase-or-event-date",
+      "expected_value": "2026-01-13",
+      "field": "purchase_or_event_date"
+    },
+    {
+      "acceptable_values": [],
+      "allow_unknown": true,
+      "claim_id": "claim-m7-warranty-05-order-or-reference",
+      "expected_value": null,
+      "field": "order_or_reference"
+    },
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-warranty-05-desired-outcome",
+      "expected_value": "Synthetic repair outcome 05",
+      "field": "desired_outcome"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_claims.v1"
+}

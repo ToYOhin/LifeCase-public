@@ -23,6 +23,7 @@ export type TimelineEventKind =
   | "action_failed"
   | "action_cancelled"
   | "action_approved"
+  | "action_progress_recorded"
   | "approval_requested"
   | "approval_approved"
   | "approval_rejected"

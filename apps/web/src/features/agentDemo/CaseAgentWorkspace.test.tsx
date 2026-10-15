@@ -16,7 +16,9 @@ describe("Case Agent workspace", () => {
     );
 
     expect(markup).not.toContain("AI 设置");
-    expect(markup.indexOf("真实模型")).toBeLessThan(markup.indexOf("离线开发演示"));
+    expect(markup).toContain("只读证据分析");
+    expect(markup).toContain("离线开发演示");
+    expect(markup.indexOf("只读证据分析")).toBeLessThan(markup.indexOf("离线开发演示"));
     expect(markup).not.toContain("证据 Agent 演示");
     expect(markup).toMatch(/<details class="fake-demo-drawer">/);
     expect(markup).not.toMatch(/<details class="fake-demo-drawer" open/);
@@ -35,6 +37,8 @@ describe("Case Agent workspace", () => {
     );
 
     expect(closed).not.toContain("fake demo sentinel");
+    expect(closed).not.toContain("Fake Provider");
     expect(open).toContain("fake demo sentinel");
+    expect(open).toContain("Fake Provider");
   });
 });

@@ -1,0 +1,1 @@
+Synthetic administrative record m7-warranty-08. Merchant: Synthetic Warranty Organization 08. Amount: USD 121.92. Event date: 2026-04-16T09:30:00+08:00. Reference: SYN-WARRANTY-08. Desired outcome: Synthetic repair outcome 08. This generated material contains no real person, account, address, credential, or payment instrument.

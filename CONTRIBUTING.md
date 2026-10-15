@@ -1,15 +1,15 @@
 # Contributing
 
-欢迎通过 Issue 或 Pull Request 提交问题、修复和改进建议。
+LifeCase is a personal, local-first project. Contributions should preserve evidence provenance and human control. Repository visibility does not grant an open-source license; see the license statement in `README.md`.
 
-## 开始之前
+## Before changing code
 
-- 只使用合成或不可逆脱敏的数据；
-- 不提交凭据、个人材料、运行数据库、导出包或本机绝对路径；
-- 保持模型 Provider 默认关闭，不在测试中调用真实或付费模型；
-- 不改变 Case scope、人工确认或外部行动边界，除非变更明确说明风险并包含对应测试。
+1. Identify the user-visible outcome, acceptance criteria, and affected behavior.
+2. Check the branch and existing changes; preserve unrelated work.
+3. Read the affected implementation, tests, and relevant contracts. Consult the roadmap when choosing new work, not as a prerequisite for every fix.
+4. Treat dated status and release evidence as historical snapshots; verify live state before making current publication claims.
 
-## 本地验证
+## Development setup
 
 ```powershell
 uv sync --frozen
@@ -17,13 +17,41 @@ npm ci
 .\scripts\verify.ps1
 ```
 
-提交应保持范围小、说明清楚，并包含与改动风险相称的测试。UI 变更应同时检查桌面和移动视口。
+## Change requirements
 
-## Pull Request
+- Add meaningful tests for new behavior and regressions; documentation and cosmetic changes do not need implementation-mirroring tests.
+- Keep imported personal material out of commits.
+- Update API/data/security documentation with semantic changes.
+- Add an ADR for a durable architecture or privacy decision.
+- Keep commits narrow and descriptive.
+- Do not combine dependency upgrades with feature work.
+- Keep personal material, secrets, and machine-specific coordination outside Git.
 
-Pull Request 请说明：
+## Validation proportional to the change
 
-- 改了什么以及为什么；
-- 用户或兼容性影响；
-- 执行了哪些验证；
-- 是否涉及数据、凭据、网络、Provider 或外部行动边界。
+- Documentation: check facts, local links, and `git diff --check`; no application build is needed.
+- Local code: run the affected tests and relevant lint/type checks first.
+- Shared contracts, persistence, cross-layer behavior, or release code: run `scripts/verify.ps1` and the relevant acceptance checks.
+- Windows API changes: also run `uv run mypy --platform linux apps/api/src` and the affected Windows tests. Ubuntu CI alone does not verify native Windows integration or the packaged EXE.
+- Packaging: follow `docs/WINDOWS_INSTALLER.md` and `docs/RELEASE_CHECKLIST.md`; installer acceptance changes current-user installation state and is not a routine documentation check.
+
+Run resource-heavy checks serially. Repeat passing checks only after a relevant change, failure, or unresolved concern. Ordinary tests use synthetic fixtures or deterministic fakes, not live billable models or personal data.
+
+## Commit style
+
+Use an imperative summary with an optional roadmap ID:
+
+```text
+M1-02 add immutable source storage
+fix approval hash validation
+docs clarify explicit deadline semantics
+```
+
+## Pull request checklist
+
+- [ ] Scope and acceptance criteria are clear.
+- [ ] Checks appropriate to the change pass; unverified behavior is stated.
+- [ ] No credentials or personal data are included.
+- [ ] User-visible and semantic changes are documented.
+- [ ] External side effects remain gated or disabled.
+- [ ] Changed product facts and contracts are documented; unrelated historical records are preserved.

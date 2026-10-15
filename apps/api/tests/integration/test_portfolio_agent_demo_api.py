@@ -309,6 +309,7 @@ def test_agent_demo_no_match_changes_rag_decision_to_unknown(tmp_path: Path) -> 
         "statements": [],
         "citations": [],
         "uncertainty_reason": "No authoritative Case evidence matched the Case goal.",
+        "fact_references": [],
     }
     assert run["tool_calls"][0]["result"] == "no_match"
 

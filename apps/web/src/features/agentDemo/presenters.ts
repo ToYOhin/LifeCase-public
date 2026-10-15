@@ -34,14 +34,19 @@ export function agentDemoView(
 
 export function stageLabel(stage: AgentStageName): string {
   return {
-    extract: "提取事实",
+    extract: "提取候选事实",
     normalize: "规范化",
     link_claims: "关联事实",
     classify_case: "识别案件类型",
     check_gaps: "检查缺件",
     propose_actions: "提出只读建议",
-    validate: "证据校验",
+    validate: "证据检索 / 回答",
   }[stage];
+}
+
+export function liveWorkflowLabel(stageOrder: AgentStageName[]): string {
+  if (stageOrder.length === 1 && stageOrder[0] === "validate") return "问题证据分析";
+  return stageOrder.length === 7 ? "旧版七阶段" : "提取与证据回答";
 }
 
 export function runStatusLabel(status: string): string {
@@ -87,7 +92,23 @@ export function claimFieldLabel(field: string): string {
 }
 
 export function claimStatusLabel(status: string): string {
-  return status === "inferred" ? "推断" : status === "candidate" ? "候选" : status;
+  return {
+    candidate: "候选",
+    inferred: "推断",
+    confirmed: "已确认",
+    corrected: "已修正",
+    rejected: "已拒绝",
+  }[status] ?? "状态待核对";
+}
+
+export function claimReviewNote(status: string): string {
+  return {
+    candidate: "模型提取，待人工复核",
+    inferred: "模型推断，待人工复核",
+    confirmed: "已按来源或人工记录确认",
+    corrected: "已采用修正后的事实",
+    rejected: "不作为已确认事实",
+  }[status] ?? "请到事实复核查看当前记录";
 }
 
 export function claimValueLabel(field: string, value: unknown): string {

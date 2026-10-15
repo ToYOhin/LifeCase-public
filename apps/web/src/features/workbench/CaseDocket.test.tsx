@@ -54,4 +54,17 @@ describe("Case docket presentation", () => {
     expect(markup).toContain("在上方建立第一份本地案件");
     expect(markup).not.toContain("从下面建立");
   });
+
+  it("keeps concrete missing materials and next actions without an uncalculated risk metric", () => {
+    const markup = renderToStaticMarkup(<CaseDocket mode="full" state="ready" cases={[{ ...item,
+      missing_evidence: { required_claims: ["product_name"], evidence_requirements: ["purchase_proof"], total: 2 },
+      next_action: { id: "action_a", kind: "collect_evidence", status: "ready", risk_level: "B", blocker_count: 0, version: 1 },
+    }]} onOpen={() => undefined} onRefresh={() => undefined} onCreate={() => undefined} />);
+    expect(markup).toContain("产品名称");
+    expect(markup).toContain("购买凭证");
+    expect(markup).toContain("补齐证据");
+    expect(markup).toContain("可推进");
+    expect(markup).toContain("条材料缺口");
+    expect(markup).not.toContain("截止风险未计算");
+  });
 });

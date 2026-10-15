@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from lifecase.actions import (
+    ActionIntegrityError,
     ActionRecord,
     ActionRiskLevel,
     ActionService,
@@ -84,6 +85,7 @@ class ApprovalService:
         try:
             self._connection.execute("BEGIN IMMEDIATE")
             action = self._load_action(command.action_id)
+            ActionService(self._connection).require_current_analysis(action)
             if action.version != command.expected_action_version:
                 raise ApprovalActionVersionConflictError(action.version)
             if action.payload.sha256 != command.payload_sha256:
@@ -143,6 +145,9 @@ class ApprovalService:
         except ApprovalServiceError:
             self._rollback()
             raise
+        except ActionIntegrityError as error:
+            self._rollback()
+            raise ApprovalActionInvalidError("Action analysis is no longer current") from error
         except (ActionServiceError, sqlite3.Error, TypeError, ValueError) as error:
             self._rollback()
             raise ApprovalPersistenceError("Approval request was rolled back") from error
@@ -172,7 +177,7 @@ class ApprovalService:
         except ApprovalServiceError:
             self._rollback()
             raise
-        except ActionTransitionNotAllowedError as error:
+        except (ActionTransitionNotAllowedError, ActionIntegrityError) as error:
             self._rollback()
             raise ApprovalActionInvalidError("Action is not approval-eligible") from error
         except (ActionServiceError, sqlite3.Error, TypeError, ValueError) as error:

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CaseWorkflow } from "./CaseWorkflow";
 
 describe("Case workflow", () => {
-  it("renders the five progressive areas but mounts only the active area", () => {
+  it("renders the five progressive areas and keeps unvisited actions lazy", () => {
     const markup = renderToStaticMarkup(
       <CaseWorkflow
         caseTitle="合成保修案件"
@@ -26,7 +26,7 @@ describe("Case workflow", () => {
     );
 
     expect(markup).toContain("案件概览");
-    expect(markup).toContain("Agent 分析");
+    expect(markup).toContain("问题分析");
     expect(markup).toContain("事实复核");
     expect(markup).toContain("行动与截止");
     expect(markup).toContain("记录与导出");
@@ -40,6 +40,9 @@ describe("Case workflow", () => {
     );
     expect(markup.match(/合成保修案件/g)).toHaveLength(1);
     expect(markup).toContain("进入事实复核");
+    expect(markup).toContain("确认提取状态并复核事实。");
+    const tabs = markup.match(/<div[^>]*role="tablist"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
+    expect(tabs).not.toMatch(/<small>|<span>/);
     expect(markup).not.toContain("按当前任务打开案卷");
     expect(markup).toContain("workflow-area-select");
   });

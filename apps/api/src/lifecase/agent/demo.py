@@ -8,6 +8,7 @@ import re
 import sqlite3
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from typing import cast
 
 from lifecase.agent.extraction import (
     WARRANTY_EXTRACTION_SCHEMA_VERSION,
@@ -16,7 +17,7 @@ from lifecase.agent.extraction import (
     warranty_extraction_stage_input,
 )
 from lifecase.agent.models import (
-    STAGE_ORDER,
+    LIVE_TWO_STAGE_RUN_PREFIX,
     AgentBudget,
     AgentRunRecord,
     AgentRunStatus,
@@ -30,10 +31,15 @@ from lifecase.agent.models import (
     StageBudget,
     StageInput,
     stage_input_scope_sha256,
+    stage_order_for_run,
 )
+from lifecase.agent.question_binding import QUESTION_RUN_PREFIX, validate_question_binding
+from lifecase.agent.question_context import binding_status, require_current_binding
 from lifecase.agent.rag import (
     EVIDENCE_BACKED_ANSWER_SCHEMA_VERSION,
     EVIDENCE_BACKED_RAG_STAGE_REGISTRY,
+    QUESTION_RAG_REGISTRY,
+    TWO_STAGE_RAG_REGISTRY,
     EvidenceBackedRagCheckpointHandler,
     evidence_backed_rag_stage_input,
 )
@@ -88,6 +94,10 @@ class PortfolioAgentRunNotExecutableError(PortfolioAgentDemoError):
     """Raised when lifecycle state forbids execution or retry."""
 
 
+class PortfolioAgentRunChangedError(PortfolioAgentDemoError):
+    """Raised when a command no longer targets the displayed run."""
+
+
 class PortfolioAgentRunModeError(PortfolioAgentDemoError):
     """Raised when a route attempts to operate on another product run mode."""
 
@@ -106,6 +116,7 @@ class PortfolioAgentDemoState:
     answer: dict[str, object] | None
     tool_calls: tuple[dict[str, object], ...]
     history: tuple[dict[str, object], ...]
+    analysis: dict[str, object] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,8 +176,10 @@ class PortfolioAgentDemoService:
         matching = [row for row in rows if str(row["id"]).startswith(self._run_id_prefix)]
         if rows and not matching:
             raise PortfolioAgentRunModeError("Case Agent run belongs to another mode")
-        run = None if not matching else self._reader().get_run(case_id, str(matching[0]["id"]))
-        history_runs = tuple(self._reader().get_run(case_id, str(row["id"])) for row in matching)
+        history_runs = tuple(
+            self._reader(str(row["id"])).get_run(case_id, str(row["id"])) for row in matching
+        )
+        run = None if not history_runs else history_runs[0]
         return PortfolioAgentDemoState(
             enabled=self._enabled,
             run=run,
@@ -177,9 +190,16 @@ class PortfolioAgentDemoService:
                 self._history_item(item, len(history_runs) - index)
                 for index, item in enumerate(history_runs)
             ),
+            analysis=self._analysis(run),
         )
 
-    def create(self, case_id: str, *, run_id: str | None = None) -> PortfolioAgentDemoState:
+    def create(
+        self,
+        case_id: str,
+        *,
+        run_id: str | None = None,
+        input_binding_json: str | None = None,
+    ) -> PortfolioAgentDemoState:
         """Create, but do not yet execute, the cancellable durable run."""
 
         self._require_enabled()
@@ -196,17 +216,29 @@ class PortfolioAgentDemoService:
         resolved_run_id = run_id or _run_id(case_id)
         if not resolved_run_id.startswith(self._run_id_prefix):
             raise ValueError("Agent run mode is invalid")
-        self._reader().create_run(
+        self._reader(resolved_run_id).create_run(
             CreateAgentRunCommand(
                 run_id=resolved_run_id,
                 case_id=case_id,
                 budget=self._agent_budget,
                 allow_case_history=self._allow_new_runs,
+                input_binding_json=input_binding_json,
+                input_binding_sha256=(
+                    None
+                    if input_binding_json is None
+                    else hashlib.sha256(input_binding_json.encode()).hexdigest()
+                ),
             )
         )
         return self.get_state(case_id)
 
-    async def execute(self, case_id: str, *, retry_only: bool = False) -> PortfolioAgentDemoState:
+    async def execute(
+        self,
+        case_id: str,
+        *,
+        retry_only: bool = False,
+        expected_run_id: str | None = None,
+    ) -> PortfolioAgentDemoState:
         """Execute remaining fixed stages until completion or a fail-closed stop."""
 
         self._require_enabled()
@@ -215,6 +247,7 @@ class PortfolioAgentDemoService:
         run = state.run
         if run is None:
             raise PortfolioAgentRunMissingError("Agent run was not found")
+        _require_expected_run(run, expected_run_id)
         if retry_only:
             if not _can_retry(run):
                 raise PortfolioAgentRunNotExecutableError("Agent run is not retryable")
@@ -234,29 +267,30 @@ class PortfolioAgentDemoService:
         } or _can_retry(run):
             stage = _next_stage(run)
             stage_input = self._stage_input(case_id, run, stage)
-            output_json = self._fixed_output(stage_input)
             existing_stage = next((item for item in run.stages if item.stage is stage), None)
             call_number = 1 if existing_stage is None else existing_stage.usage.calls + 1
-            script = FakeProviderScript(
-                request_scope_sha256=stage_call_scope_sha256(
-                    run.id, stage, stage_input.input_scope_sha256, call_number
-                ),
-                output_json=output_json,
-                usage=ProviderUsage(
-                    input_tokens=10,
-                    output_tokens=5,
-                    total_tokens=15,
-                    cost_minor_units=0,
-                    cost_currency="CNY",
-                ),
-            )
-            provider = self._evaluation_provider or FakeModelProvider(
-                ModelProviderConfig(provider=ModelProviderKind.FAKE), (script,)
-            )
+            provider = self._evaluation_provider
+            if provider is None:
+                script = FakeProviderScript(
+                    request_scope_sha256=stage_call_scope_sha256(
+                        run.id, stage, stage_input.input_scope_sha256, call_number
+                    ),
+                    output_json=self._fixed_output(stage_input),
+                    usage=ProviderUsage(
+                        input_tokens=10,
+                        output_tokens=5,
+                        total_tokens=15,
+                        cost_minor_units=0,
+                        cost_currency="CNY",
+                    ),
+                )
+                provider = FakeModelProvider(
+                    ModelProviderConfig(provider=ModelProviderKind.FAKE), (script,)
+                )
             runner = StageRunner(
                 self._connection,
                 provider,
-                registry=self._stage_registry,
+                registry=self._registry_for_run(run.id),
                 checkpoint_handler=EvidenceBackedRagCheckpointHandler(),
             )
             run = await runner.execute_stage(
@@ -277,12 +311,15 @@ class PortfolioAgentDemoService:
                 break
         return self.get_state(case_id)
 
-    def cancel(self, case_id: str) -> PortfolioAgentDemoState:
+    def cancel(
+        self, case_id: str, *, expected_run_id: str | None = None
+    ) -> PortfolioAgentDemoState:
         """Cancel a queued or otherwise unfinished run through StageRunner authority."""
 
         self._require_enabled()
         run = self._required_run(case_id)
-        self._reader().request_cancellation(
+        _require_expected_run(run, expected_run_id)
+        self._reader(run.id).request_cancellation(
             CancelAgentRunCommand(
                 run_id=run.id,
                 case_id=case_id,
@@ -291,14 +328,17 @@ class PortfolioAgentDemoService:
         )
         return self.get_state(case_id)
 
-    def recover(self, case_id: str) -> PortfolioAgentDemoState:
+    def recover(
+        self, case_id: str, *, expected_run_id: str | None = None
+    ) -> PortfolioAgentDemoState:
         """Charge and stop an interrupted in-flight reservation for explicit retry."""
 
         self._require_enabled()
         run = self._required_run(case_id)
+        _require_expected_run(run, expected_run_id)
         if run.status is not AgentRunStatus.RUNNING:
             raise PortfolioAgentRunNotExecutableError("Agent run does not need recovery")
-        self._reader().recover_interrupted(
+        self._reader(run.id).recover_interrupted(
             RecoverAgentRunCommand(
                 run_id=run.id,
                 case_id=case_id,
@@ -323,6 +363,24 @@ class PortfolioAgentDemoService:
                 prior_checkpoint_hashes=prior,
             )
         if stage is AgentStageName.VALIDATE:
+            if run.input_binding_json is not None:
+                require_current_binding(self._connection, run.input_binding_json, case_id)
+                binding = validate_question_binding(run.input_binding_json, case_id)
+                basis = cast(dict[str, object], binding["basis"])
+                question = str(binding["question"])
+                return evidence_backed_rag_stage_input(
+                    self._connection,
+                    _evidence_tool_request(
+                        self._connection,
+                        case_id,
+                        question,
+                        enable_fallback=self._enable_retrieval_fallback,
+                        retrieval_query=str(binding["retrieval_query"]),
+                    ),
+                    prior_checkpoint_hashes=prior,
+                    question=question,
+                    current_facts=cast(dict[str, object], basis["facts"]),
+                )
             case = CaseService(self._connection).get_case(case_id)
             return evidence_backed_rag_stage_input(
                 self._connection,
@@ -333,8 +391,9 @@ class PortfolioAgentDemoService:
                     enable_fallback=self._enable_retrieval_fallback,
                 ),
                 prior_checkpoint_hashes=prior,
+                two_stage=run.id.startswith(LIVE_TWO_STAGE_RUN_PREFIX),
             )
-        definition = EVIDENCE_BACKED_RAG_STAGE_REGISTRY.get(stage)
+        definition = self._registry_for_run(run.id).get(stage)
         payload_json = canonical_json_object(
             {
                 "case_id": case_id,
@@ -411,7 +470,13 @@ class PortfolioAgentDemoService:
             for row in rows
         )
 
-    def evidence_scope(self, case_id: str) -> PortfolioAgentEvidenceScope:
+    def evidence_scope(
+        self,
+        case_id: str,
+        *,
+        question: str | None = None,
+        retrieval_query: str | None = None,
+    ) -> PortfolioAgentEvidenceScope:
         """Preview every unique Segment sent by extraction or validate RAG."""
 
         case = CaseService(self._connection).get_case(case_id)
@@ -423,8 +488,9 @@ class PortfolioAgentDemoService:
             _evidence_tool_request(
                 self._connection,
                 case_id,
-                case.goal,
+                case.goal if question is None else question,
                 enable_fallback=self._enable_retrieval_fallback,
+                retrieval_query=retrieval_query,
             )
         )
         validation = tuple(
@@ -440,15 +506,22 @@ class PortfolioAgentDemoService:
             for item in result.context.items
         )
         return PortfolioAgentEvidenceScope(
-            extraction=self.evidence(case_id),
+            extraction=self.evidence(case_id) if question is None else (),
             validation=validation,
         )
 
-    def _reader(self) -> StageRunner:
+    def _registry_for_run(self, run_id: str) -> StageRegistry:
+        if run_id.startswith(QUESTION_RUN_PREFIX):
+            return QUESTION_RAG_REGISTRY
+        if run_id.startswith(LIVE_TWO_STAGE_RUN_PREFIX):
+            return TWO_STAGE_RAG_REGISTRY
+        return self._stage_registry
+
+    def _reader(self, run_id: str) -> StageRunner:
         return StageRunner(
             self._connection,
             FakeModelProvider(ModelProviderConfig(provider=ModelProviderKind.FAKE), ()),
-            registry=self._stage_registry,
+            registry=self._registry_for_run(run_id),
             checkpoint_handler=EvidenceBackedRagCheckpointHandler(),
         )
 
@@ -502,9 +575,11 @@ class PortfolioAgentDemoService:
     def _history_item(self, run: AgentRunRecord, version: int) -> dict[str, object]:
         provider, model_id = _run_provider_identity(run)
         answer = self._answer(run)
+        analysis = self._analysis(run)
         return {
             "version": version,
             "id": run.id,
+            "stage_order": [stage.value for stage in stage_order_for_run(run.id)],
             "status": run.status.value,
             "provider": provider,
             "model_id": model_id,
@@ -513,6 +588,21 @@ class PortfolioAgentDemoService:
             "total_tokens": run.usage.total_tokens,
             "created_at": run.created_at,
             "completed_at": run.completed_at,
+            "question": None if analysis is None else analysis["question"],
+            "basis_status": "legacy" if analysis is None else analysis["basis_status"],
+            "answer": answer,
+        }
+
+    def _analysis(self, run: AgentRunRecord | None) -> dict[str, object] | None:
+        if run is None or run.input_binding_json is None:
+            return None
+        binding = validate_question_binding(run.input_binding_json, run.case_id)
+        facts = cast(dict[str, object], cast(dict[str, object], binding["basis"])["facts"])
+        return {
+            "question": binding["question"],
+            "basis_sha256": binding["basis_sha256"],
+            "basis_status": binding_status(self._connection, run.input_binding_json, run.case_id),
+            "facts": facts["items"],
         }
 
     def _answer(self, run: AgentRunRecord | None) -> dict[str, object] | None:
@@ -525,11 +615,26 @@ class PortfolioAgentDemoService:
             for statement in payload["statements"]
             for reference in statement["source_refs"]
         ]
+        fact_references: list[dict[str, object]] = []
+        if run is not None and run.input_binding_json is not None:
+            binding = validate_question_binding(run.input_binding_json, run.case_id)
+            facts = cast(dict[str, object], cast(dict[str, object], binding["basis"])["facts"])
+            references = {
+                (reference["claim_id"], reference["version"], reference["value_sha256"])
+                for statement in payload["statements"]
+                for reference in statement.get("fact_refs", [])
+            }
+            fact_references = [
+                item
+                for item in cast(list[dict[str, object]], facts["items"])
+                if (item["claim_id"], item["version"], item["value_sha256"]) in references
+            ]
         return {
             "status": payload["status"],
             "statements": [item["text"] for item in payload["statements"]],
             "citations": citations,
             "uncertainty_reason": payload["uncertainty_reason"],
+            "fact_references": fact_references,
         }
 
     def _tool_calls(self, run: AgentRunRecord | None) -> tuple[dict[str, object], ...]:
@@ -551,24 +656,82 @@ def _run_id(case_id: str) -> str:
     return f"portfolio-demo-{hashlib.sha256(case_id.encode()).hexdigest()[:32]}"
 
 
+def _require_expected_run(run: AgentRunRecord, expected_run_id: str | None) -> None:
+    if (expected_run_id is not None and expected_run_id != run.id) or (
+        run.id.startswith(QUESTION_RUN_PREFIX) and expected_run_id is None
+    ):
+        raise PortfolioAgentRunChangedError("The displayed Agent run has changed")
+
+
+_RETRIEVAL_TASK_STOPWORDS = frozenset(
+    {
+        "and",
+        "check",
+        "confirm",
+        "determine",
+        "facts",
+        "for",
+        "organize",
+        "prepare",
+        "the",
+        "to",
+        "validate",
+        "verify",
+        "whether",
+    }
+)
+
+_WARRANTY_ALIAS_GROUPS = (
+    ("保修", "warranty", ("warranty", "保修期")),
+    ("维修", "repair", ("repair", "维修单")),
+    ("购买", "purchase", ("purchase", "购买日")),
+    ("故障", "fault", ("fault", "故障现")),
+    ("报修", "service", ("service", "报修回")),
+    ("合成", "synthetic", ("synthetic", "合成演")),
+)
+
+
 def _safe_retrieval_query(goal: str) -> str:
     """Treat the Case goal as text, never as caller-controlled FTS syntax."""
 
     normalized = " ".join(goal.split())
+    identifier_terms: list[str] = []
     ascii_terms: list[str] = []
     cjk_terms: list[str] = []
-    for token in re.findall(r"[A-Za-z0-9]+|[\u3400-\u9fff]+", normalized):
-        if re.fullmatch(r"[A-Za-z0-9]+", token):
-            if len(token) >= 3:
-                ascii_terms.append(token.lower())
+    for token in re.findall(
+        r"[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*|[\u3400-\u9fff]+",
+        normalized,
+    ):
+        if re.fullmatch(r"[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*", token):
+            lowered = token.lower()
+            if lowered in _RETRIEVAL_TASK_STOPWORDS:
+                continue
+            if (
+                len(lowered) >= 3
+                and any(character.isalpha() for character in lowered)
+                and any(character.isdigit() for character in lowered)
+            ):
+                identifier_terms.append(lowered)
+            elif len(lowered) >= 3:
+                ascii_terms.append(lowered)
             continue
         if len(token) <= 4:
             cjk_terms.append(token)
         else:
             cjk_terms.extend(token[index : index + 3] for index in range(len(token) - 2))
-    if cjk_terms:
-        return _join_retrieval_terms(cjk_terms, operator="OR")
-    return _join_retrieval_terms(ascii_terms or ["case", "goal"], operator="AND")
+    terms = [*identifier_terms, *cjk_terms, *ascii_terms]
+    return _join_retrieval_terms(terms or ["case", "goal"], operator="OR")
+
+
+def _warranty_alias_terms(goal: str) -> tuple[str, ...]:
+    normalized = " ".join(goal.split())
+    english_tokens = frozenset(re.findall(r"[a-z]+", normalized.casefold()))
+    return tuple(
+        alias
+        for chinese_marker, english_marker, aliases in _WARRANTY_ALIAS_GROUPS
+        if chinese_marker in normalized or english_marker in english_tokens
+        for alias in aliases
+    )
 
 
 def _join_retrieval_terms(terms: list[str], *, operator: str) -> str:
@@ -577,11 +740,15 @@ def _join_retrieval_terms(terms: list[str], *, operator: str) -> str:
         unique_terms = ("case", "goal")
     query_parts: list[str] = []
     for term in unique_terms:
-        candidate = f" {operator} ".join((*query_parts, f'"{term}"'))
+        quoted_term = f'"{term}"'
+        # An oversized identifier must not suppress later usable goal terms.
+        if len(quoted_term) > 256:
+            continue
+        candidate = f" {operator} ".join((*query_parts, quoted_term))
         if len(candidate) > 256:
             break
-        query_parts.append(f'"{term}"')
-    return f" {operator} ".join(query_parts)
+        query_parts.append(quoted_term)
+    return f" {operator} ".join(query_parts or ['"case"', '"goal"'])
 
 
 def _run_provider_identity(run: AgentRunRecord) -> tuple[str | None, str | None]:
@@ -599,12 +766,14 @@ def _evidence_tool_request(
     goal: str,
     *,
     enable_fallback: bool,
+    retrieval_query: str | None = None,
 ) -> EvidenceContextToolRequest:
     return EvidenceContextToolRequest(
         tool_name=EVIDENCE_CONTEXT_TOOL_NAME,
         context_request=EvidenceContextRequest(
             case_id=case_id,
-            query=(
+            query=retrieval_query
+            or (
                 _retrieval_query(connection, case_id, goal)
                 if enable_fallback
                 else _safe_retrieval_query(goal)
@@ -641,33 +810,20 @@ def _retrieval_query(connection: sqlite3.Connection, case_id: str, goal: str) ->
     if matched is not None:
         return goal_query
 
-    aliases = [
-        alias
-        for chinese, translations in (
-            ("保修", ("warranty", "保修期")),
-            ("维修", ("repair", "维修单")),
-            ("购买", ("purchase", "购买日")),
-            ("故障", ("fault", "故障现")),
-            ("报修", ("service", "报修回")),
-            ("合成", ("synthetic", "合成演")),
-        )
-        if chinese in goal
-        for alias in translations
-    ]
+    aliases = _warranty_alias_terms(goal)
     if not aliases:
         return goal_query
-    return _join_retrieval_terms(aliases, operator="OR")
+    return _join_retrieval_terms(list(aliases), operator="OR")
 
 
 def _next_stage(run: AgentRunRecord) -> AgentStageName:
     if run.status is AgentRunStatus.NEEDS_REVIEW and run.current_stage is not None:
         return run.current_stage
-    completed = (
-        0 if run.last_completed_stage is None else STAGE_ORDER.index(run.last_completed_stage) + 1
-    )
-    if completed >= len(STAGE_ORDER):
+    order = stage_order_for_run(run.id)
+    completed = 0 if run.last_completed_stage is None else order.index(run.last_completed_stage) + 1
+    if completed >= len(order):
         raise PortfolioAgentRunNotExecutableError("Agent run has no remaining stage")
-    return STAGE_ORDER[completed]
+    return order[completed]
 
 
 def _can_retry(run: AgentRunRecord) -> bool:

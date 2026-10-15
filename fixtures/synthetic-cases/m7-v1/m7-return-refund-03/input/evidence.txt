@@ -1,0 +1,1 @@
+Synthetic administrative record m7-return-refund-03. Merchant: Synthetic Return Organization 03. Amount: CNY 104.11. Event date: 2026-03-03. Reference: SYN-RETURN-REFUND-03. Desired outcome: Synthetic refund outcome 03. This generated material contains no real person, account, address, credential, or payment instrument.

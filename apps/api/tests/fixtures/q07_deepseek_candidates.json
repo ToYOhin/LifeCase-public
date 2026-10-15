@@ -1,0 +1,215 @@
+{
+  "synthetic_only": true,
+  "source": {
+    "recording": "LifeCase-q1-deepseek-20260928",
+    "description": "Recorded Q07 synthetic DeepSeek candidates for offline regression tests.",
+    "extraction": "Parse choices[0].message.content from each original response as a JSON object.",
+    "preservation": "Original text, references, identifiers, hashes and quote ranges are unchanged. Tests bind isolated identifiers in memory."
+  },
+  "candidates": [
+    {
+      "call_number": 7,
+      "original_input_sha256": "c064a7e168dd8f5d8c16c6b78aac83643a0f6ecbf5c1478eee080cafba14056b",
+      "original_response_sha256": "58ee1f7e462747721706745d8857413fa43f97692cc2ce1e3d2df3126e97f678",
+      "output": {
+        "stage": "validate",
+        "stage_version": "validate.question.v1",
+        "checkpoint_schema_version": "validate.question.checkpoint.v1",
+        "checkpoint": {
+          "schema_version": "evidence_backed_answer.v2",
+          "status": "answered",
+          "statements": [
+            {
+              "text": "当前人工核实后的型号是 H9。",
+              "source_refs": [],
+              "fact_refs": [
+                {
+                  "case_id": "case_20260928083350452043_c64a2910e22242729e46d8c1227ce0e0",
+                  "claim_id": "claim_20260928083350884890_001c6bdf4a32490e9ac0f1ea33fb8612",
+                  "version": 3,
+                  "value_sha256": "366884b370fdcd852530d48da9c632c5d8498df39bd7751f6dbf7fd2bd1f482c"
+                }
+              ]
+            },
+            {
+              "text": "材料里的保修期是二十四个月。",
+              "source_refs": [
+                {
+                  "case_id": "case_20260928083350452043_c64a2910e22242729e46d8c1227ce0e0",
+                  "source_id": "src_20260928083350502778_de6194c9692148d7b0189c75eb474254",
+                  "segment_id": "seg_f3899e2ba3b61186e77dabd8311da176cd5de906e05a8b2af3592c61f3d62900",
+                  "sequence": 0,
+                  "page": null,
+                  "text_sha256": "c797c0d139655671de4db0bc7a66a549dc81674c066c226788266c9895f42149",
+                  "quote_start": 22,
+                  "quote_end": 24,
+                  "quote_hash": "2022230f1ebad3b047adb017728ceb4cc7548bf496d1eea8fef345fadd115a35"
+                }
+              ],
+              "fact_refs": []
+            }
+          ],
+          "uncertainty_reason": null,
+          "tool": {
+            "name": "evidence_context.search.v1",
+            "call_count": 1,
+            "context_sha256": "0f8d2c2614f53fd6591968b6e7640393a169d1fabbe845af67f82b27d6897e94"
+          }
+        }
+      }
+    },
+    {
+      "call_number": 8,
+      "original_input_sha256": "584bdc742e139f5327710d017d0556893536f17cf2382fbd61c424c8283d0452",
+      "original_response_sha256": "8591ce9e22b10fa7d00c906585d99e7047b54697421283ea67386cb40c2e47d1",
+      "output": {
+        "stage": "validate",
+        "stage_version": "validate.question.v1",
+        "checkpoint_schema_version": "validate.question.checkpoint.v1",
+        "checkpoint": {
+          "schema_version": "evidence_backed_answer.v2",
+          "status": "answered",
+          "statements": [
+            {
+              "text": "washing machine 当前人工核实后的型号是 H9。",
+              "source_refs": [],
+              "fact_refs": [
+                {
+                  "case_id": "case_20260928083350452043_c64a2910e22242729e46d8c1227ce0e0",
+                  "claim_id": "claim_20260928083350884890_001c6bdf4a32490e9ac0f1ea33fb8612",
+                  "version": 3,
+                  "value_sha256": "366884b370fdcd852530d48da9c632c5d8498df39bd7751f6dbf7fd2bd1f482c"
+                }
+              ]
+            },
+            {
+              "text": "材料里的保修期是二十四个月。",
+              "source_refs": [
+                {
+                  "case_id": "case_20260928083350452043_c64a2910e22242729e46d8c1227ce0e0",
+                  "source_id": "src_20260928083350502778_de6194c9692148d7b0189c75eb474254",
+                  "segment_id": "seg_f3899e2ba3b61186e77dabd8311da176cd5de906e05a8b2af3592c61f3d62900",
+                  "sequence": 0,
+                  "page": null,
+                  "text_sha256": "c797c0d139655671de4db0bc7a66a549dc81674c066c226788266c9895f42149",
+                  "quote_start": 25,
+                  "quote_end": 31,
+                  "quote_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                }
+              ],
+              "fact_refs": []
+            }
+          ],
+          "uncertainty_reason": null,
+          "tool": {
+            "name": "evidence_context.search.v1",
+            "call_count": 1,
+            "context_sha256": "0f8d2c2614f53fd6591968b6e7640393a169d1fabbe845af67f82b27d6897e94"
+          }
+        }
+      }
+    },
+    {
+      "call_number": 21,
+      "original_input_sha256": "81d55a6ef5c89e37f6cc075f5f4d2a20f83e30f2695f48a31574cabc3170c2a4",
+      "original_response_sha256": "b72a386a8f71eab88490a1d8129bccf7011fc5c18924681f8bd6e03e70f8f5e0",
+      "output": {
+        "stage": "validate",
+        "stage_version": "validate.question.v1",
+        "checkpoint_schema_version": "validate.question.checkpoint.v1",
+        "checkpoint": {
+          "schema_version": "evidence_backed_answer.v2",
+          "status": "answered",
+          "statements": [
+            {
+              "text": "当前人工核实后的型号是 H9。",
+              "source_refs": [],
+              "fact_refs": [
+                {
+                  "case_id": "case_20260928083354706929_e2ee7e87a045404aa68a2b8f4d095c66",
+                  "claim_id": "claim_20260928083355160293_206d4937100c423d83051cd2f9db24ac",
+                  "version": 3,
+                  "value_sha256": "366884b370fdcd852530d48da9c632c5d8498df39bd7751f6dbf7fd2bd1f482c"
+                }
+              ]
+            },
+            {
+              "text": "材料里的保修期是二十四个月。",
+              "source_refs": [
+                {
+                  "case_id": "case_20260928083354706929_e2ee7e87a045404aa68a2b8f4d095c66",
+                  "source_id": "src_20260928083354747056_8149b656930b4b6884eecc7355f3706a",
+                  "segment_id": "seg_412b0a619bd780d65e59c679938d8bba2bc3f45517d35ee89dd94e4992055b61",
+                  "sequence": 0,
+                  "page": null,
+                  "text_sha256": "c797c0d139655671de4db0bc7a66a549dc81674c066c226788266c9895f42149",
+                  "quote_start": 22,
+                  "quote_end": 24,
+                  "quote_hash": "2022230f1ebad3b047adb017728ceb4cc7548bf496d1eea8fef345fadd115a35"
+                }
+              ],
+              "fact_refs": []
+            }
+          ],
+          "uncertainty_reason": null,
+          "tool": {
+            "name": "evidence_context.search.v1",
+            "call_count": 1,
+            "context_sha256": "5505ed5fcb63dcc852b0254173cd9ffbef44e95e920b1d3ae1faee5210594edb"
+          }
+        }
+      }
+    },
+    {
+      "call_number": 22,
+      "original_input_sha256": "2e06f9ae0788ee56b8a4e2b3e1834be58e80c03399a8792eb12f2cccc48f7e2f",
+      "original_response_sha256": "dd750fd33aaad2c052dd3212c9ea17979af69dafa0163fda1b7dd041111db968",
+      "output": {
+        "stage": "validate",
+        "stage_version": "validate.question.v1",
+        "checkpoint_schema_version": "validate.question.checkpoint.v1",
+        "checkpoint": {
+          "schema_version": "evidence_backed_answer.v2",
+          "status": "answered",
+          "statements": [
+            {
+              "text": "当前人工核实后的型号是 H9。",
+              "source_refs": [],
+              "fact_refs": [
+                {
+                  "case_id": "case_20260928083354706929_e2ee7e87a045404aa68a2b8f4d095c66",
+                  "claim_id": "claim_20260928083355160293_206d4937100c423d83051cd2f9db24ac",
+                  "version": 3,
+                  "value_sha256": "366884b370fdcd852530d48da9c632c5d8498df39bd7751f6dbf7fd2bd1f482c"
+                }
+              ]
+            },
+            {
+              "text": "材料里的保修期是二十四个月。",
+              "source_refs": [
+                {
+                  "case_id": "case_20260928083354706929_e2ee7e87a045404aa68a2b8f4d095c66",
+                  "source_id": "src_20260928083354747056_8149b656930b4b6884eecc7355f3706a",
+                  "segment_id": "seg_412b0a619bd780d65e59c679938d8bba2bc3f45517d35ee89dd94e4992055b61",
+                  "sequence": 0,
+                  "page": null,
+                  "text_sha256": "c797c0d139655671de4db0bc7a66a549dc81674c066c226788266c9895f42149",
+                  "quote_start": 25,
+                  "quote_end": 31,
+                  "quote_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                }
+              ],
+              "fact_refs": []
+            }
+          ],
+          "uncertainty_reason": null,
+          "tool": {
+            "name": "evidence_context.search.v1",
+            "call_count": 1,
+            "context_sha256": "5505ed5fcb63dcc852b0254173cd9ffbef44e95e920b1d3ae1faee5210594edb"
+          }
+        }
+      }
+    }
+  ]
+}

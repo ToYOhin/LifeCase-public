@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { AgentDemoPanel } from "./AgentDemoPanel";
 import { LiveAgentPanel } from "./LiveAgentPanel";
+import type { ActionFollowUpTarget } from "../actions/actionFollowUpState";
 
 interface CaseAgentWorkspaceProps {
   caseId: string | null;
@@ -8,6 +9,8 @@ interface CaseAgentWorkspaceProps {
   caseType: string | null;
   refreshKey: number;
   onChanged: () => Promise<void>;
+  actionFollowUp?: ActionFollowUpTarget | null;
+  onOpenAction?: (caseId: string, actionId: string) => void;
 }
 
 export function CaseAgentWorkspace(props: CaseAgentWorkspaceProps) {
@@ -19,7 +22,7 @@ export function CaseAgentWorkspace(props: CaseAgentWorkspaceProps) {
 
   return (
     <section className="case-agent-workspace" aria-label="案件 Agent 工作区">
-      <LiveAgentPanel {...props} />
+      <LiveAgentPanel key={props.caseId} {...props} />
       <FakeDemoDrawer open={fakeDemoOpen} onToggle={setFakeDemoOpen}>
         <AgentDemoPanel {...props} />
       </FakeDemoDrawer>
@@ -42,9 +45,11 @@ export function FakeDemoDrawer({ open, onToggle, children }: FakeDemoDrawerProps
     >
       <summary>
         <span>离线开发演示</span>
-        <small>确定性 Fake Provider · API 与行为保持不变</small>
       </summary>
-      {open && children}
+      {open && <>
+        <p>开发用固定示例（Fake Provider），不代表真实模型分析结果。</p>
+        {children}
+      </>}
     </details>
   );
 }

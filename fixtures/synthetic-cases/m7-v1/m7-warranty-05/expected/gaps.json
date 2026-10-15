@@ -1,0 +1,13 @@
+{
+  "blockers": [
+    "missing_order_or_reference"
+  ],
+  "case_id": "m7-warranty-05",
+  "missing_claims": [
+    "order_or_reference"
+  ],
+  "missing_evidence": [
+    "reference_evidence"
+  ],
+  "schema_version": "lifecase.m7.expected_gaps.v1"
+}

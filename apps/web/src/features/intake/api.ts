@@ -51,13 +51,48 @@ export async function transitionCase(
   input: CaseTransitionInput,
   request: typeof fetch = fetch,
 ): Promise<CaseTransitionRecord> {
-  return requestJson<CaseTransitionRecord>(
+  const result = await requestJson<CaseTransitionRecord>(
     await request(`/api/v1/cases/${encodeURIComponent(caseId)}/transitions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }),
   );
+  if (!result || result.case_id !== caseId || result.prior_version !== input.expected_version ||
+    result.new_version !== input.expected_version + 1 || result.new_status !== input.target_status ||
+    result.actor !== input.actor || result.reason !== input.reason) {
+    throw new LifeCaseApiError("unexpected_response", "状态保存结果无法确认，请重新读取案件状态。", true);
+  }
+  return result;
+}
+
+// A failed read after saving must never repeat the transition command.
+export async function readCaseAfterTransition(caseId: string, saved: CaseTransitionRecord | null, request: typeof fetch = fetch): Promise<CaseRecord> {
+  const record = await readImportCase(caseId, null, request);
+  if (!Number.isInteger(record.version) || record.version < 1 || (saved &&
+    (saved.case_id !== caseId || record.version < saved.new_version ||
+      (record.version === saved.new_version && record.status !== saved.new_status)))) {
+    throw new LifeCaseApiError("unexpected_response", "案件状态尚未核对，请重新读取。", true);
+  }
+  return record;
+}
+
+// These errors can occur after Source persistence; retryability is not proof of rollback.
+export function importRequiresRead(reason: unknown): boolean {
+  return !(reason instanceof LifeCaseApiError) || reason.retryable ||
+    ["extraction_failed", "source_integrity_failed"].includes(reason.code);
+}
+
+// Recover the read after an upload without repeating the upload itself.
+export async function readImportCase(caseId: string, imported: SourceRecord | null, request: typeof fetch = fetch): Promise<CaseRecord> {
+  const record = await getCase(caseId, (url, init) => request(url, { ...init, cache: "no-store" }));
+  if (!record || record.id !== caseId || !Array.isArray(record.sources) || record.sources.some(source => source?.case_id !== caseId)) {
+    throw new LifeCaseApiError("unexpected_response", "材料列表无法确认，请重新读取。", true);
+  }
+  if (imported && (imported.case_id !== caseId || !record.sources.some(source => source.id === imported.id && source.sha256 === imported.sha256))) {
+    throw new LifeCaseApiError("unexpected_response", "已保存材料尚未在同案列表中核对，请重新读取。", true);
+  }
+  return record;
 }
 
 export function uploadSource(
@@ -78,8 +113,15 @@ export function uploadSource(
     request.addEventListener("load", () => {
       const payload: unknown = request.response;
       if (request.status >= 200 && request.status < 300) {
+        const source = payload as SourceRecord | null;
+        if (!source || source.case_id !== caseId || typeof source.id !== "string" || !source.id ||
+          typeof source.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(source.sha256) ||
+          !["pending", "completed", "completed_with_notices", "failed", "ocr_required"].includes(source.extraction?.status)) {
+          reject(new LifeCaseApiError("unexpected_response", "导入结果无法确认，请先重新读取材料列表。", true));
+          return;
+        }
         onProgress(100);
-        resolve(payload as SourceRecord);
+        resolve(source);
         return;
       }
       reject(apiError(payload, request.status));

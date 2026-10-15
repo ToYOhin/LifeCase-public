@@ -28,6 +28,7 @@ const activityLabels: Record<CaseActivityKind, string> = {
 const fieldLabels: Record<string, string> = {
   merchant_or_manufacturer: "商家或制造商",
   product_name: "产品名称",
+  serial_number: "序列号",
   purchase_date: "购买日期",
   order_number: "订单编号",
   desired_outcome: "期望结果",
@@ -48,6 +49,12 @@ const fieldLabels: Record<string, string> = {
   business_purpose: "业务用途",
   receipt: "收据或发票",
   payment_proof: "付款凭证",
+  return_tracking_number: "退货物流单号",
+  approval_reference: "预审批编号",
+  purchase_or_event_date: "购买或发生日期",
+  order_or_reference: "订单或参考编号",
+  cancellation_confirmation_reference: "取消确认编号",
+  reference_evidence: "订阅或请求参考材料",
 };
 
 export function workbenchView(

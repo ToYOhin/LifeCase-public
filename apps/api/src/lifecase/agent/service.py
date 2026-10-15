@@ -28,7 +28,6 @@ from lifecase.agent.errors import (
     AgentVersionConflictError,
 )
 from lifecase.agent.models import (
-    STAGE_ORDER,
     AgentBudget,
     AgentCheckpoint,
     AgentRunRecord,
@@ -45,7 +44,10 @@ from lifecase.agent.models import (
     StageBudget,
     StageInput,
     checkpoint_payload,
+    stage_order_for_run,
 )
+from lifecase.agent.question_binding import validate_run_binding
+from lifecase.agent.rag import question_provider_input
 from lifecase.agent.registry import (
     BUILT_IN_STAGE_REGISTRY,
     StageDefinition,
@@ -60,6 +62,11 @@ from lifecase.providers.models import (
     request_scope_sha256,
 )
 from lifecase.providers.protocol import ModelProvider
+
+_REPAIR_INSTRUCTION = (
+    " The previous candidate failed local schema validation. "
+    "Return one corrected object without commentary."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +166,23 @@ class StageRunner:
     ) -> AgentRunRecord:
         """Execute one stage with durable reservation, one repair, and fail-closed stops."""
 
+        provider_input_json = command.stage_input.payload_json
+        definition = self._registry.get(command.stage_input.stage)
+        if definition.stage_version == "validate.question.v1":
+            # Preserve stored input scope and leave room for the one repair's
+            # fixed prompt/schema within the existing 100 KB provider boundary.
+            overhead = sum(
+                len(part.encode("utf-8"))
+                for part in (
+                    definition.system_instruction,
+                    definition.stage_instruction,
+                    definition.output_schema_json,
+                    _REPAIR_INSTRUCTION,
+                )
+            )
+            provider_input_json = question_provider_input(
+                self._connection, command.stage_input, maximum_bytes=100_000 - overhead
+            )
         context = self._reserve_call(command)
         self._inject_failure("after_stage_reservation")
         local_cancellation = asyncio.Event()
@@ -172,7 +196,7 @@ class StageRunner:
         self._active_cancellations[context.run_id] = local_cancellation
         try:
             while True:
-                request = self._provider_request(context)
+                request = self._provider_request(context, provider_input_json)
                 try:
                     result = await self._await_provider(
                         request,
@@ -303,21 +327,46 @@ class StageRunner:
                 ).fetchone()
             if existing is not None:
                 record = self._run_from_row(existing, ())
-                if record.id != command.run_id or record.budget != command.budget:
+                if (
+                    record.id != command.run_id
+                    or record.budget != command.budget
+                    or record.input_binding_json != command.input_binding_json
+                    or record.input_binding_sha256 != command.input_binding_sha256
+                ):
                     raise AgentSequenceError(
                         "Case already has an Agent run",
                         code=AgentErrorCode.INVALID_SEQUENCE,
                     )
                 self._connection.execute("COMMIT")
                 return self.get_run(command.case_id, command.run_id)
+            if command.allow_case_history:
+                unfinished = self._connection.execute(
+                    """
+                    SELECT 1 FROM agent_run WHERE case_id = ?
+                    AND status IN ('queued', 'running', 'checkpointed') LIMIT 1
+                    """,
+                    (command.case_id,),
+                ).fetchone()
+                if unfinished is not None:
+                    raise AgentSequenceError(
+                        "Case has an unfinished Agent run",
+                        code=AgentErrorCode.INVALID_SEQUENCE,
+                    )
+            if command.input_binding_json is not None:
+                from lifecase.agent.question_context import require_current_binding
+
+                require_current_binding(
+                    self._connection, command.input_binding_json, command.case_id
+                )
             budget = command.budget
             self._connection.execute(
                 """
                 INSERT INTO agent_run (
                     id, case_id, status, version, max_calls,
                     max_input_tokens, max_output_tokens, max_total_tokens,
-                    max_cost_minor, cost_currency, created_at, updated_at
-                ) VALUES (?, ?, 'queued', 1, ?, ?, ?, ?, ?, ?, ?, ?)
+                    max_cost_minor, cost_currency, created_at, updated_at,
+                    input_binding_json, input_binding_sha256
+                ) VALUES (?, ?, 'queued', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     command.run_id,
@@ -330,10 +379,12 @@ class StageRunner:
                     budget.cost_currency,
                     timestamp,
                     timestamp,
+                    command.input_binding_json,
+                    command.input_binding_sha256,
                 ),
             )
             self._connection.execute("COMMIT")
-        except (AgentCaseNotFoundError, AgentSequenceError):
+        except (AgentCaseNotFoundError, AgentSequenceError, AgentIntegrityError):
             self._rollback()
             raise
         except sqlite3.Error as error:
@@ -345,6 +396,14 @@ class StageRunner:
         return self.get_run(command.case_id, command.run_id)
 
     def _reserve_call(self, command: ExecuteStageCommand) -> _ReservedCall:
+        # A caller-selected registry must not change the persisted run's contract.
+        if tuple(item.stage for item in self._registry.definitions) != stage_order_for_run(
+            command.run_id
+        ):
+            raise AgentSequenceError(
+                "Agent registry does not match the run",
+                code=AgentErrorCode.INVALID_SEQUENCE,
+            )
         stage_input = command.stage_input
         definition = self._registry.get(stage_input.stage)
         if stage_input.case_id == "" or (
@@ -356,6 +415,7 @@ class StageRunner:
         try:
             self._connection.execute("BEGIN IMMEDIATE")
             run = self._required_run_row(stage_input.case_id, command.run_id)
+            self._require_current_bound_inputs(run)
             run_version = int(run["version"])
             if run_version != command.expected_run_version:
                 raise AgentVersionConflictError(run_version)
@@ -534,9 +594,14 @@ class StageRunner:
         )
 
     def _validate_next_stage(self, run: sqlite3.Row, requested: AgentStageName) -> None:
+        order = stage_order_for_run(str(run["id"]))
         last = _optional_stage(run["last_completed_stage"])
-        expected_index = 0 if last is None else STAGE_ORDER.index(last) + 1
-        if expected_index >= len(STAGE_ORDER) or STAGE_ORDER[expected_index] is not requested:
+        if last is not None and last not in order:
+            raise AgentIntegrityError(
+                "Agent checkpoint stage is inconsistent", code=AgentErrorCode.INTEGRITY
+            )
+        expected_index = 0 if last is None else order.index(last) + 1
+        if expected_index >= len(order) or order[expected_index] is not requested:
             raise AgentSequenceError(
                 "Agent stage order is invalid",
                 code=AgentErrorCode.INVALID_SEQUENCE,
@@ -580,7 +645,8 @@ class StageRunner:
     def _validate_checkpoint_chain(self, run_id: str, stage_input: StageInput) -> None:
         payload = json.loads(stage_input.payload_json)
         supplied = tuple(str(value) for value in payload["prior_checkpoint_hashes"])
-        stage_index = STAGE_ORDER.index(stage_input.stage)
+        order = stage_order_for_run(run_id)
+        stage_index = order.index(stage_input.stage)
         expected_rows = self._connection.execute(
             """
             SELECT stage, checkpoint_sha256 FROM agent_stage_run
@@ -593,7 +659,7 @@ class StageRunner:
             """,
             (run_id, stage_input.case_id),
         ).fetchall()
-        expected_stages = STAGE_ORDER[:stage_index]
+        expected_stages = order[:stage_index]
         if tuple(AgentStageName(str(row["stage"])) for row in expected_rows) != (expected_stages):
             raise AgentIntegrityError(
                 "Agent checkpoint chain is inconsistent",
@@ -702,19 +768,16 @@ class StageRunner:
             ),
         )
 
-    def _provider_request(self, context: _ReservedCall) -> StructuredGenerationRequest:
-        repair_instruction = ""
-        if context.repair_count:
-            repair_instruction = (
-                " The previous candidate failed local schema validation. "
-                "Return one corrected object without commentary."
-            )
+    def _provider_request(
+        self, context: _ReservedCall, provider_input_json: str
+    ) -> StructuredGenerationRequest:
+        repair_instruction = _REPAIR_INSTRUCTION if context.repair_count else ""
         return StructuredGenerationRequest(
             request_id=f"agent-{context.request_scope_sha256[:32]}",
             request_scope_sha256=context.request_scope_sha256,
             system_instruction=context.definition.system_instruction,
             stage_instruction=context.definition.stage_instruction + repair_instruction,
-            input_json=context.input_json,
+            input_json=provider_input_json,
             output_schema_name=context.definition.output_schema_name,
             output_schema_json=context.definition.output_schema_json,
             max_output_tokens=context.reservation.output_tokens,
@@ -792,6 +855,20 @@ class StageRunner:
                     "Agent run reservation is inconsistent",
                     code=AgentErrorCode.INTEGRITY,
                 )
+            # A changed question basis cannot be repaired by another model call.
+            # Account for the completed call and release its reservation before
+            # stopping; do not reserve another call against the stale input.
+            try:
+                self._require_current_bound_inputs(run)
+            except AgentIntegrityError:
+                self._rollback()
+                self._finalize_failure(
+                    context,
+                    code=AgentErrorCode.INTEGRITY,
+                    retryable=False,
+                    result=result,
+                )
+                raise
             charge = (charged_input, charged_output, charged_cost)
             if not _row_can_account_and_reserve(stage, context.reservation, charge) or not (
                 _row_can_account_and_reserve(run, context.reservation, charge)
@@ -935,6 +1012,17 @@ class StageRunner:
                     code=AgentErrorCode.CANCELLED,
                 )
             self._inject_failure("before_stage_finalize")
+            try:
+                self._require_current_bound_inputs(run)
+            except AgentIntegrityError:
+                self._rollback()
+                self._finalize_failure(
+                    context,
+                    code=AgentErrorCode.INTEGRITY,
+                    retryable=False,
+                    result=result,
+                )
+                raise
             if self._checkpoint_handler is not None:
                 self._checkpoint_handler.commit(
                     connection=self._connection,
@@ -1407,6 +1495,7 @@ class StageRunner:
         row: sqlite3.Row,
         stages: tuple[AgentStageRecord, ...],
     ) -> AgentRunRecord:
+        binding_json, binding_sha256 = self._stored_binding(row)
         budget = AgentBudget(
             max_calls=int(row["max_calls"]),
             max_input_tokens=int(row["max_input_tokens"]),
@@ -1428,7 +1517,28 @@ class StageRunner:
             updated_at=str(row["updated_at"]),
             completed_at=_optional_text(row["completed_at"]),
             stages=stages,
+            input_binding_json=binding_json,
+            input_binding_sha256=binding_sha256,
         )
+
+    @staticmethod
+    def _stored_binding(row: sqlite3.Row) -> tuple[str | None, str | None]:
+        binding_json = _optional_text(row["input_binding_json"])
+        binding_sha256 = _optional_text(row["input_binding_sha256"])
+        try:
+            validate_run_binding(str(row["id"]), str(row["case_id"]), binding_json, binding_sha256)
+        except AgentValidationError as error:
+            raise AgentIntegrityError(
+                "Agent question input binding is invalid", code=AgentErrorCode.INTEGRITY
+            ) from error
+        return binding_json, binding_sha256
+
+    def _require_current_bound_inputs(self, row: sqlite3.Row) -> None:
+        binding_json, _binding_sha256 = self._stored_binding(row)
+        if binding_json is not None:
+            from lifecase.agent.question_context import require_current_binding
+
+            require_current_binding(self._connection, binding_json, str(row["case_id"]))
 
     def _stage_from_row(self, row: sqlite3.Row) -> AgentStageRecord:
         stage = AgentStageName(str(row["stage"]))

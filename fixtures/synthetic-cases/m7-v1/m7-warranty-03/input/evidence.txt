@@ -1,0 +1,1 @@
+Synthetic administrative record m7-warranty-03. Merchant: Synthetic Warranty Organization 03. Amount: CNY 115.07. Event date: 2026-11-11. Reference: SYN-WARRANTY-03. Desired outcome: Synthetic repair outcome 03. This generated material contains no real person, account, address, credential, or payment instrument.

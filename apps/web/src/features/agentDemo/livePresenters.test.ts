@@ -6,10 +6,16 @@ import {
   claimValueLabel,
   completedStageCount,
   liveProviderLabel,
+  liveWorkflowLabel,
 } from "./presenters";
 import type { AgentStageTrace } from "./types";
 
 describe("Live Agent demo presenters", () => {
+  it("distinguishes question analysis from both persisted legacy plans", () => {
+    expect(liveWorkflowLabel(["validate"])).toBe("问题证据分析");
+    expect(liveWorkflowLabel(["extract", "validate"])).toBe("提取与证据回答");
+    expect(liveWorkflowLabel(["extract", "normalize", "link_claims", "classify_case", "check_gaps", "propose_actions", "validate"])).toBe("旧版七阶段");
+  });
   it("labels configured providers without relabeling disabled state", () => {
     expect(liveProviderLabel("deepseek")).toBe("DeepSeek");
     expect(liveProviderLabel("openai")).toBe("OpenAI");
@@ -18,7 +24,7 @@ describe("Live Agent demo presenters", () => {
     expect(liveProviderLabel("disabled")).toBe("默认关闭");
   });
 
-  it("reports the completed portion of the fixed seven-stage pipeline", () => {
+  it("counts saved checkpoints without counting an in-progress stage", () => {
     const stages = [
       stage("extract", "checkpointed"),
       stage("normalize", "checkpointed"),

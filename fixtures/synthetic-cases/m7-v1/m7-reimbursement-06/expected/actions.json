@@ -1,0 +1,16 @@
+{
+  "case_id": "m7-reimbursement-06",
+  "items": [
+    {
+      "action_id": "action-m7-reimbursement-06",
+      "blockers": [
+        "missing_order_or_reference"
+      ],
+      "kind": "collect_evidence",
+      "may_execute": true,
+      "requires_approval": false,
+      "risk_level": "A"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_actions.v1"
+}

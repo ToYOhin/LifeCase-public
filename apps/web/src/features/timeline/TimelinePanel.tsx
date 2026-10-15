@@ -1,15 +1,15 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { LifeCaseApiError } from "../intake/api";
-import { requirementLabel, statusLabel } from "../workbench/presenters";
+import { statusLabel } from "../workbench/presenters";
 import { getTimeline } from "./api";
 import {
   eventStatus,
-  shortAuthority,
   timelineKindLabel,
   timelineOriginLabel,
   timelineTime,
   timelineView,
+  timelineEventLabel,
 } from "./presenters";
 import type { TimelineEvent, TimelineLoadState, TimelineResult } from "./types";
 
@@ -22,6 +22,8 @@ interface TimelinePanelProps {
 export function TimelinePanel({ caseId, caseTitle, refreshKey }: TimelinePanelProps) {
   const [result, setResult] = useState<TimelineResult | null>(null);
   const [state, setState] = useState<TimelineLoadState>("idle");
+  const sequence = useRef(0);
+  const target = useRef(caseId); target.current = caseId;
 
   useEffect(() => {
     if (!caseId) {
@@ -30,14 +32,21 @@ export function TimelinePanel({ caseId, caseTitle, refreshKey }: TimelinePanelPr
       return;
     }
     void loadTimeline(caseId);
+    return () => { sequence.current += 1; };
   }, [caseId, refreshKey]);
 
   async function loadTimeline(targetCaseId: string) {
+    if (target.current !== targetCaseId) return;
+    const generation = ++sequence.current;
     setState("loading");
     try {
-      setResult(await getTimeline(targetCaseId));
+      const next = await getTimeline(targetCaseId);
+      if (sequence.current !== generation || target.current !== targetCaseId) return;
+      if (next.case_id !== targetCaseId || next.events.some(event => event.case_id !== targetCaseId)) throw new Error("Case authority mismatch");
+      setResult(next);
       setState("ready");
     } catch (reason) {
+      if (sequence.current !== generation || target.current !== targetCaseId) return;
       setResult(null);
       setState(
         reason instanceof LifeCaseApiError && reason.code === "network_error"
@@ -47,78 +56,67 @@ export function TimelinePanel({ caseId, caseTitle, refreshKey }: TimelinePanelPr
     }
   }
 
-  const events = result?.events ?? [];
+  const events = result?.case_id === caseId ? result.events : [];
   const view = timelineView(caseId, state, events.length);
 
   return (
     <section className="case-timeline" aria-labelledby="timeline-title">
       <div className="timeline-head">
         <div>
-          <p className="section-label">CASE CHRONICLE</p>
-          <h2 id="timeline-title">案件进展与恢复记录</h2>
+          <h2 id="timeline-title">案件记录</h2>
           {caseTitle && <p>{caseTitle}</p>}
         </div>
         <div className="timeline-recovery-seal">
           <strong>{String(events.length).padStart(2, "0")}</strong>
-          <span>条权威记录</span>
-          <small>刷新 / 重启可恢复</small>
+          <span>条记录</span>
         </div>
       </div>
 
       {view === "unselected" && (
         <TimelineState mark="—" title="尚未选择案件">
-          从 Today 台账打开案件；Timeline 不会跨案件聚合记录。
+          从案件列表打开一个案件后查看记录。
         </TimelineState>
       )}
       {view === "loading" && (
-        <TimelineState mark="···" title="正在恢复持久化进展" role="status">
-          正在按 Case 范围重新读取 SQLite 权威记录。
+        <TimelineState mark="···" title="正在读取案件记录" role="status">
+          {null}
         </TimelineState>
       )}
       {view === "empty" && (
-        <TimelineState mark="00" title="尚无可呈现事件">
-          当前案件还没有材料、状态转换、事实决定、截止日期、Agent 状态或产物记录。
+        <TimelineState mark="00" title="暂无案件记录">
+          导入材料或处理待办后，可在这里回看。
         </TimelineState>
       )}
       {view === "offline" && (
-        <TimelineState mark="OFF" title="本地 API 未连接" role="alert">
-          持久化进展没有丢失；启动 API 后可重新恢复。
+        <TimelineState mark="!" title="服务未连接" role="alert">
+          连接恢复后可重新读取案件记录。
           <button type="button" onClick={() => caseId && void loadTimeline(caseId)}>
             重新连接
           </button>
         </TimelineState>
       )}
       {view === "failure" && (
-        <TimelineState mark="ERR" title="Timeline 无法安全读取" role="alert">
-          权威关联可能不一致，系统已停止展示而不是使用不完整历史。
+        <TimelineState mark="!" title="案件记录暂时无法读取" role="alert">
+          暂未取得完整记录，请重新读取。
           <button type="button" onClick={() => caseId && void loadTimeline(caseId)}>
-            重新校验
+            重新读取
           </button>
         </TimelineState>
       )}
       {view === "populated" && result && (
-        <>
-          <div className="timeline-availability" role="note">
-            <span>已覆盖：材料、转换、事实决定、截止日期、Action、Agent、产物</span>
-            <span>审批已接入；沟通草稿仍只作为本地 Action 投影，不代表已发送</span>
-          </div>
-          <ol className="timeline-spine">
-            {events.map((event, index) => (
-              <TimelineItem event={event} index={index} key={event.event_id} />
-            ))}
-          </ol>
-        </>
+        <ol className="timeline-spine">
+          {events.map((event, index) => (
+            <TimelineItem event={event} index={index} key={event.event_id} />
+          ))}
+        </ol>
       )}
     </section>
   );
 }
 
-function TimelineItem({ event, index }: { event: TimelineEvent; index: number }) {
+export function TimelineItem({ event, index }: { event: TimelineEvent; index: number }) {
   const status = eventStatus(event);
-  const label =
-    event.authority_type === "claim_event" && event.label
-      ? requirementLabel(event.label)
-      : event.label;
+  const label = timelineEventLabel(event);
   return (
     <li className={`timeline-event event-${event.kind}`}>
       <div className="timeline-clock">
@@ -132,7 +130,6 @@ function TimelineItem({ event, index }: { event: TimelineEvent; index: number })
             <small>{timelineOriginLabel(event.origin)}</small>
             <h3>{timelineKindLabel(event.kind)}</h3>
           </div>
-          <code title={event.authority_id}>{shortAuthority(event.authority_id)}</code>
         </div>
         <div className="timeline-event-facts">
           {label && <strong>{label}</strong>}
@@ -147,10 +144,13 @@ function TimelineItem({ event, index }: { event: TimelineEvent; index: number })
           {event.actor && <span>操作者 {event.actor}</span>}
         </div>
         {event.reason && <p className="timeline-reason">{event.reason}</p>}
-        <p className="timeline-reference">
-          {event.authority_type} · {event.subject_id}
-          {event.parent_id ? ` · 上级 ${event.parent_id}` : ""}
-        </p>
+        <details className="timeline-reference">
+          <summary>记录详情</summary>
+          <p>记录类型：{event.authority_type}</p>
+          <p>记录编号：{event.authority_id}</p>
+          <p>关联对象：{event.subject_id}</p>
+          {event.parent_id && <p>上级记录：{event.parent_id}</p>}
+        </details>
       </article>
     </li>
   );

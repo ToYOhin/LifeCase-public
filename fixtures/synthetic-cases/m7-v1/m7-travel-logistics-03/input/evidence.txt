@@ -1,0 +1,1 @@
+Synthetic administrative record m7-travel-logistics-03. Merchant: Synthetic Travel Org 03. Amount: USD 141.10. Event date: 2026-06-03T09:30:00+08:00. Reference: SYN-TRAVEL-LOGISTICS-03. Desired outcome: Synthetic compensation outcome 03. This generated material contains no real person, account, address, credential, or payment instrument.

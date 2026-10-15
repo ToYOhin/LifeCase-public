@@ -93,12 +93,12 @@ describe("Portfolio Agent Demo presentation", () => {
   });
 
   it("gives all fixed stages explicit human labels", () => {
-    expect(stageLabel("extract")).toBe("提取事实");
+    expect(stageLabel("extract")).toBe("提取候选事实");
     expect(stageLabel("normalize")).toBe("规范化");
     expect(stageLabel("link_claims")).toBe("关联事实");
     expect(stageLabel("classify_case")).toBe("识别案件类型");
     expect(stageLabel("check_gaps")).toBe("检查缺件");
     expect(stageLabel("propose_actions")).toBe("提出只读建议");
-    expect(stageLabel("validate")).toBe("证据校验");
+    expect(stageLabel("validate")).toBe("证据检索 / 回答");
   });
 });

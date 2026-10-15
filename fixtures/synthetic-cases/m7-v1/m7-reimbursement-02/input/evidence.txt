@@ -1,0 +1,1 @@
+Synthetic administrative record m7-reimbursement-02. Merchant: Synthetic Reimbursement Organization 02. Amount: USD 124.66. Event date: 2026-06-18T09:30:00+08:00. Reference: SYN-REIMBURSEMENT-02. Desired outcome: Synthetic reimbursement outcome 02. This generated material contains no real person, account, address, credential, or payment instrument.

@@ -7,6 +7,7 @@ import json
 import re
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 
 _IDENTIFIER = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -349,6 +350,7 @@ class ActionRecord:
     version: int
     created_at: str
     updated_at: str
+    analysis_basis_status: Literal["current", "changed", "unavailable"] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,7 +382,14 @@ def _canonical_payload(kind: ActionKind, value: object) -> str:
             ),
         }
     elif kind is ActionKind.PREPARE_COMMUNICATION:
-        _exact_keys(value, {"intent", "recipient_role"})
+        base_keys = {"intent", "recipient_role"}
+        analysis_keys = {
+            "draft_text",
+            "analysis_run_id",
+            "analysis_basis_sha256",
+            "analysis_answer_sha256",
+        }
+        _exact_keys(value, base_keys | analysis_keys if set(value) & analysis_keys else base_keys)
         normalized = {
             "intent": _choice(
                 value["intent"],
@@ -389,6 +398,21 @@ def _canonical_payload(kind: ActionKind, value: object) -> str:
             ),
             "recipient_role": _identifier(value["recipient_role"], "Action payload is invalid"),
         }
+        if "draft_text" in value:
+            if normalized != {"intent": "request_remedy", "recipient_role": "merchant"}:
+                raise ActionCommandValidationError("Analysis Action purpose is invalid")
+            normalized.update(
+                draft_text=validate_analysis_draft_text(value["draft_text"]),
+                analysis_run_id=_bounded_text(
+                    value["analysis_run_id"], 200, "Analysis Run is invalid"
+                ),
+                analysis_basis_sha256=_hash(
+                    value["analysis_basis_sha256"], "Analysis basis is invalid"
+                ),
+                analysis_answer_sha256=_hash(
+                    value["analysis_answer_sha256"], "Analysis answer is invalid"
+                ),
+            )
     elif kind is ActionKind.FOLLOW_UP:
         _exact_keys(value, {"purpose"})
         normalized = {"purpose": _bounded_text(value["purpose"], 500, "Action payload is invalid")}
@@ -404,6 +428,17 @@ def _canonical_payload(kind: ActionKind, value: object) -> str:
 def _exact_keys(value: dict[object, object], keys: set[str]) -> None:
     if set(value) != keys or not all(isinstance(key, str) for key in value):
         raise ActionCommandValidationError("Action payload is invalid")
+
+
+def validate_analysis_draft_text(value: object) -> str:
+    """Keep reviewed text verbatim, within the existing Action payload budget."""
+    if not isinstance(value, str) or not value.strip() or len(value) > 500 or "\x00" in value:
+        raise ActionCommandValidationError("Analysis draft text is invalid")
+    try:
+        value.encode("utf-8")
+    except UnicodeError as error:
+        raise ActionCommandValidationError("Analysis draft text is invalid") from error
+    return value
 
 
 def _typed_tuple(value: object, item_type: type[object], maximum: int, message: str) -> None:

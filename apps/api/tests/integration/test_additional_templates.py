@@ -115,6 +115,33 @@ def test_reviewed_catalog_contains_four_distinct_deterministic_templates() -> No
     assert len({item.required_claims for item in first}) == 4
 
 
+def test_catalog_exposes_bound_conditional_fields_without_promoting_required_claims(
+    tmp_path: Path,
+) -> None:
+    with TestClient(create_app(_config(tmp_path))) as client:
+        response = client.get("/api/v1/templates")
+
+    assert response.status_code == 200
+    catalog = response.json()
+    for item in catalog:
+        template = BUILT_IN_TEMPLATE_REGISTRY.load_exact(
+            case_type=item["case_type"],
+            template_id=item["template_id"],
+            template_version=item["template_version"],
+        )
+        assert item["conditional_claims"] == [
+            {"when": condition.when, "field": condition.field}
+            for condition in template.conditional_claims
+        ]
+        assert item["required_claims"] == list(template.required_claims)
+        assert item["content_sha256"] == template.content_sha256
+    warranty = next(item for item in catalog if item["case_type"] == "warranty")
+    assert warranty["conditional_claims"] == [
+        {"when": "manufacturer_requires_serial", "field": "serial_number"}
+    ]
+    assert "serial_number" not in warranty["required_claims"]
+
+
 @pytest.mark.parametrize("case_type", list(_EXPECTED))
 def test_additional_template_semantics_are_explicit_and_pure(
     tmp_path: Path,

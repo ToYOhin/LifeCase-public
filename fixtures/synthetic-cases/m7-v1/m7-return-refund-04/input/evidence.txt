@@ -1,0 +1,1 @@
+Synthetic administrative record m7-return-refund-04. Merchant: Synthetic Return Organization 04. Amount: USD 105.48. Event date: 2026-04-04T09:30:00+08:00. Reference: SYN-RETURN-REFUND-04. Desired outcome: Synthetic refund outcome 04. This generated material contains no real person, account, address, credential, or payment instrument.

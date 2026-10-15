@@ -114,14 +114,12 @@ export function DeadlinePanel({ caseId, caseTitle, refreshKey, onChanged }: Dead
     <section className="deadline-board" aria-labelledby="deadline-title">
       <div className="deadline-head">
         <div>
-          <p className="section-label">DEADLINE RECORDS</p>
           <h2 id="deadline-title">截止日期与个人提醒</h2>
           {caseTitle && <p>{caseTitle}</p>}
         </div>
         <div className="deadline-seal">
           <strong>{String(items.length).padStart(2, "0")}</strong>
-          <span>条权威记录</span>
-          <small>风险尚未计算</small>
+          <span>个已登记日期</span>
         </div>
       </div>
 
@@ -146,12 +144,12 @@ export function DeadlinePanel({ caseId, caseTitle, refreshKey, onChanged }: Dead
       )}
       {view === "loading" && (
         <DeadlineState mark="···" title="正在读取截止日期" role="status">
-          正在从 SQLite 重新校验日期、事实依据与规则版本。
+          正在核对日期与关联事实。
         </DeadlineState>
       )}
       {view === "empty" && (
-        <DeadlineState mark="00" title="尚无已提交日期">
-          当前没有明确、计算或个人建议日期；系统不会猜测 deadline risk。
+        <DeadlineState mark="00" title="还没有跟进日期">
+          需要提醒时，可在上方登记；未登记不代表没有截止要求。
         </DeadlineState>
       )}
       {view === "offline" && (

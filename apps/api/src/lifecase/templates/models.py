@@ -153,6 +153,7 @@ class TemplateCatalogItem:
     title: str
     goal_options: tuple[str, ...]
     required_claims: tuple[str, ...]
+    conditional_claims: tuple[ConditionalClaim, ...]
     evidence_requirements: tuple[EvidenceRequirement, ...]
     content_sha256: str
 
@@ -168,6 +169,12 @@ class TemplateCatalogItem:
         object.__setattr__(self, "title", _validate_text(self.title, maximum=160))
         object.__setattr__(self, "goal_options", _validate_identifiers(self.goal_options))
         object.__setattr__(self, "required_claims", _validate_identifiers(self.required_claims))
+        if (
+            not isinstance(self.conditional_claims, tuple)
+            or not self.conditional_claims
+            or not all(isinstance(item, ConditionalClaim) for item in self.conditional_claims)
+        ):
+            raise TemplateModelValidationError("Conditional claims are invalid")
         if (
             not isinstance(self.evidence_requirements, tuple)
             or not self.evidence_requirements

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from lifecase.agent.errors import AgentValidationError
 from lifecase.agent.models import (
     STAGE_ORDER,
+    TWO_STAGE_ORDER,
     AgentCheckpoint,
     AgentStageName,
     StageStopCondition,
@@ -42,7 +43,11 @@ class StageRegistry:
     """Immutable fixed-order stage lookup."""
 
     def __init__(self, definitions: tuple[StageDefinition, ...]) -> None:
-        if tuple(definition.stage for definition in definitions) != STAGE_ORDER:
+        if tuple(definition.stage for definition in definitions) not in (
+            STAGE_ORDER,
+            TWO_STAGE_ORDER,
+            (AgentStageName.VALIDATE,),
+        ):
             raise AgentValidationError("Agent stage registry is invalid")
         self._definitions = definitions
         self._by_name = {definition.stage: definition for definition in definitions}

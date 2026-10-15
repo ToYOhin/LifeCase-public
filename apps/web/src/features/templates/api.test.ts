@@ -16,6 +16,7 @@ const catalog: TemplateCatalogItem[] = [
     title: "商品退货、退款或价差处理",
     goal_options: ["refund", "replacement"],
     required_claims: ["merchant", "order_number"],
+    conditional_claims: [],
     evidence_requirements: [{ key: "purchase_proof", description: "购买凭证" }],
     content_sha256: "a".repeat(64),
   },

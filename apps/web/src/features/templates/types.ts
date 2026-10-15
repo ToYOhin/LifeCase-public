@@ -16,6 +16,7 @@ export interface TemplateCatalogItem {
   title: string;
   goal_options: string[];
   required_claims: string[];
+  conditional_claims: Array<{ when: string; field: string }>;
   evidence_requirements: TemplateEvidenceRequirement[];
   content_sha256: string;
 }

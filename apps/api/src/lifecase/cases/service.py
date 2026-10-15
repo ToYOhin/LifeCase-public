@@ -207,6 +207,9 @@ class CaseService:
                 UNION ALL
                 SELECT case_id, 'action_updated', updated_at, 5, id
                 FROM action
+                UNION ALL
+                SELECT case_id, 'action_updated', created_at, 6, id
+                FROM action_progress
             )
             ORDER BY case_id, occurred_at DESC, kind_rank DESC, activity_id
             """
@@ -431,6 +434,7 @@ def _workbench_item(
             item
             for item in actions
             if item.status not in {ActionStatus.DONE, ActionStatus.CANCELLED}
+            and item.analysis_basis_status not in {"changed", "unavailable"}
         ),
         None,
     )

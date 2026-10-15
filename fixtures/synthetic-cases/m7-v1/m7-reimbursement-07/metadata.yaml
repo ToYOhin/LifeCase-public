@@ -1,0 +1,8 @@
+schema_version: lifecase.m7.synthetic_case.v1
+case_id: m7-reimbursement-07
+case_type: reimbursement
+support_level: reviewed_template
+title: Synthetic reimbursement evaluation m7-reimbursement-07
+goal: Record a deterministic synthetic reimbursement outcome
+input_files:
+  - input/evidence.txt

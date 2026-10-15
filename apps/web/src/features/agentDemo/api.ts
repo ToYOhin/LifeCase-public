@@ -56,43 +56,56 @@ export function getLiveAgent(
 export function authorizeLiveAgent(
   caseId: string,
   previewSha256: string,
+  question?: string,
   request: typeof fetch = fetch,
 ): Promise<LiveAgentResult> {
   return callLiveAgentRoute(
     caseId,
     "",
     "POST",
-    { preview_sha256: previewSha256, confirm_read_only: true },
+    { preview_sha256: previewSha256, confirm_read_only: true, ...(question !== undefined ? { question } : {}) },
     request,
   );
 }
 
-export function executeLiveAgent(
+export function previewLiveAgent(
   caseId: string,
+  question: string,
   request: typeof fetch = fetch,
 ): Promise<LiveAgentResult> {
-  return callLiveAgentRoute(caseId, "/execute", "POST", undefined, request);
+  return callLiveAgentRoute(caseId, "/preview", "POST", { question }, request);
+}
+
+export function executeLiveAgent(
+  caseId: string,
+  runId: string,
+  request: typeof fetch = fetch,
+): Promise<LiveAgentResult> {
+  return callLiveAgentRoute(caseId, "/execute", "POST", { expected_run_id: runId }, request);
 }
 
 export function retryLiveAgent(
   caseId: string,
+  runId: string,
   request: typeof fetch = fetch,
 ): Promise<LiveAgentResult> {
-  return callLiveAgentRoute(caseId, "/retry", "POST", undefined, request);
+  return callLiveAgentRoute(caseId, "/retry", "POST", { expected_run_id: runId }, request);
 }
 
 export function recoverLiveAgent(
   caseId: string,
+  runId: string,
   request: typeof fetch = fetch,
 ): Promise<LiveAgentResult> {
-  return callLiveAgentRoute(caseId, "/recover", "POST", undefined, request);
+  return callLiveAgentRoute(caseId, "/recover", "POST", { expected_run_id: runId }, request);
 }
 
 export function cancelLiveAgent(
   caseId: string,
+  runId: string,
   request: typeof fetch = fetch,
 ): Promise<LiveAgentResult> {
-  return callLiveAgentRoute(caseId, "/cancel", "POST", undefined, request);
+  return callLiveAgentRoute(caseId, "/cancel", "POST", { expected_run_id: runId }, request);
 }
 
 async function callAgentRoute(
@@ -128,9 +141,9 @@ async function callAgentRoute(
 
 async function callLiveAgentRoute(
   caseId: string,
-  command: AgentCommand,
+  command: AgentCommand | "/preview",
   method: "GET" | "POST",
-  authorization: { preview_sha256: string; confirm_read_only: true } | undefined,
+  authorization: { preview_sha256: string; confirm_read_only: true; question?: string } | { question: string } | { expected_run_id: string } | undefined,
   request: typeof fetch,
 ): Promise<LiveAgentResult> {
   let response: Response;
@@ -139,6 +152,7 @@ async function callLiveAgentRoute(
       `/api/v1/cases/${encodeURIComponent(caseId)}/live-agent${command}`,
       {
         method,
+        cache: "no-store",
         ...(authorization
           ? {
               headers: { "Content-Type": "application/json" },

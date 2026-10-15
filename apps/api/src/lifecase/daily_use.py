@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import secrets
@@ -15,7 +16,8 @@ import urllib.error
 import urllib.request
 from argparse import ArgumentParser
 from asyncio import CancelledError
-from contextlib import suppress
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
@@ -32,6 +34,7 @@ _LOG_NAME = "daily-use.log"
 _START_LOCK_NAME = "daily-use-start.lock"
 _STATE_FORMAT = "lifecase.daily-use-state.v1"
 _START_LOCK_FORMAT = "lifecase.daily-use-start-lock.v1"
+_CONTROL_WAIT_MS = 5000
 
 
 class _RuntimeState(TypedDict):
@@ -180,15 +183,16 @@ def start_runtime(
     state_path, stop_path, error_path, log_path = _runtime_paths(root)
     start_lock = _acquire_start_lock(root / "runtime" / _START_LOCK_NAME)
     try:
-        prior = _read_state(state_path, required=False)
-        if prior is not None and _process_exists(int(prior["pid"])):
-            raise DailyUseError(
-                "already_running",
-                "LifeCase is already running for this data directory.",
-                "Use status or stop before starting another process.",
-            )
-        _remove_runtime_control_files(state_path, stop_path)
-        error_path.unlink(missing_ok=True)
+        with _control_access(state_path):
+            prior = _read_state(state_path, required=False)
+            if prior is not None and _process_exists(int(prior["pid"])):
+                raise DailyUseError(
+                    "already_running",
+                    "LifeCase is already running for this data directory.",
+                    "Use status or stop before starting another process.",
+                )
+            _remove_runtime_control_files(state_path, stop_path)
+            _remove_control_file(error_path)
         _require_port_available(port)
 
         command = [
@@ -254,16 +258,17 @@ def stop_runtime(
 
     root = validate_runtime(selected, program_root=program_root)
     state_path, stop_path, _, _ = _runtime_paths(root)
-    state = _read_state(state_path, required=False)
-    if state is None:
-        stop_path.unlink(missing_ok=True)
-        return {"status": "stopped", "data_retained": True}
-    pid = int(state["pid"])
-    if not _process_exists(pid):
-        _remove_runtime_control_files(state_path, stop_path)
-        return {"status": "stopped", "data_retained": True}
+    with _control_access(state_path):
+        state = _read_state(state_path, required=False)
+        if state is None:
+            _remove_control_file(stop_path)
+            return {"status": "stopped", "data_retained": True}
+        pid = int(state["pid"])
+        if not _process_exists(pid):
+            _remove_runtime_control_files(state_path, stop_path)
+            return {"status": "stopped", "data_retained": True}
 
-    _atomic_json(stop_path, {"token": state["token"]})
+        _atomic_json(stop_path, {"token": state["token"]})
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline and _process_exists(pid):
         time.sleep(0.1)
@@ -279,23 +284,24 @@ def stop_runtime(
             "Close the local process manually before retrying start.",
             retryable=True,
         )
-    _remove_runtime_control_files(state_path, stop_path)
+    _remove_owned_control_files(state_path, stop_path, pid=pid, token=state["token"])
     return {"status": "stopped", "data_retained": True}
 
 
 def runtime_status(selected: Path, *, program_root: Path) -> dict[str, object]:
     root = validate_runtime(selected, program_root=program_root)
     state_path, stop_path, _, _ = _runtime_paths(root)
-    state = _read_state(state_path, required=False)
-    if state is None or not _process_exists(int(state["pid"])):
-        _remove_runtime_control_files(state_path, stop_path)
-        return {"status": "stopped", "data_retained": True}
-    return {
-        "status": state["status"],
-        "pid": state["pid"],
-        "url": f"http://127.0.0.1:{state['port']}",
-        "data_retained": True,
-    }
+    with _control_access(state_path):
+        state = _read_state(state_path, required=False)
+        if state is None or not _process_exists(int(state["pid"])):
+            _remove_runtime_control_files(state_path, stop_path)
+            return {"status": "stopped", "data_retained": True}
+        return {
+            "status": state["status"],
+            "pid": state["pid"],
+            "url": f"http://127.0.0.1:{state['port']}",
+            "data_retained": True,
+        }
 
 
 def _validated_path(selected: Path, *, program_root: Path) -> Path:
@@ -513,11 +519,74 @@ def _get_text_ok(url: str) -> bool:
         return False
 
 
-def _read_state(path: Path, *, required: bool) -> _RuntimeState | None:
-    if not path.exists() and not required:
-        return None
+@contextmanager
+def _control_access(path: Path) -> Iterator[None]:
+    """Serialize short control-file access across this runtime's Windows processes."""
+    if sys.platform != "win32":
+        yield
+        return
+
+    import ctypes
+    from ctypes import wintypes
+
+    # A normal Windows reader prevents os.replace/unlink while its handle is
+    # open. Coordinate our readers and writers, without changing atomic replace
+    # or retrying an uncooperative external holder. No process waits belong here.
+    identity = os.path.normcase(str(path.parent.resolve())).encode("utf-8")
+    name = "Global\\LifeCase.DailyUse.Control." + hashlib.sha256(identity).hexdigest()
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel32.CreateMutexW.restype = wintypes.HANDLE
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.ReleaseMutex.argtypes = [wintypes.HANDLE]
+    kernel32.ReleaseMutex.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.CreateMutexW(None, False, name)
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    acquired = False
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        result = kernel32.WaitForSingleObject(handle, _CONTROL_WAIT_MS)
+        acquired = result in (0, 0x80)  # WAIT_OBJECT_0 / WAIT_ABANDONED both grant ownership.
+        if result in (0x80, 0x102):
+            raise DailyUseError(
+                "runtime_control_interrupted" if result == 0x80 else "runtime_control_busy",
+                "LifeCase runtime control is interrupted or still in use.",
+                "Keep the data intact; check status before retrying the command.",
+                retryable=True,
+            )
+        if result != 0:
+            raise ctypes.WinError(ctypes.get_last_error())
+        yield
+    finally:
+        if acquired:
+            kernel32.ReleaseMutex(handle)
+        kernel32.CloseHandle(handle)
+
+
+def _read_control_text(path: Path) -> str:
+    with _control_access(path):
+        return path.read_text(encoding="utf-8")
+
+
+def _remove_control_file(path: Path) -> None:
+    with _control_access(path):
+        path.unlink(missing_ok=True)
+
+
+def _read_state(path: Path, *, required: bool) -> _RuntimeState | None:
+    try:
+        value = json.loads(_read_control_text(path))
+    except FileNotFoundError:
+        if not required:
+            return None
+        raise DailyUseError(
+            "runtime_state_invalid",
+            "The transient LifeCase runtime state is invalid.",
+            "Run stop to clear stale runtime state, then retry start.",
+        ) from None
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         raise DailyUseError(
             "runtime_state_invalid",
@@ -543,16 +612,16 @@ def _read_state(path: Path, *, required: bool) -> _RuntimeState | None:
 
 
 def _read_error(path: Path) -> DailyUseError | None:
-    if not path.exists():
-        return None
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))["error"]
+        value = json.loads(_read_control_text(path))["error"]
         return DailyUseError(
             str(value["code"]),
             str(value["message"]),
             str(value["action"]),
             retryable=bool(value["retryable"]),
         )
+    except FileNotFoundError:
+        return None
     except (KeyError, OSError, TypeError, UnicodeDecodeError, json.JSONDecodeError):
         return DailyUseError(
             "startup_failed",
@@ -563,91 +632,103 @@ def _read_error(path: Path) -> DailyUseError | None:
 
 
 def _atomic_json(path: Path, value: object) -> None:
-    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
-    try:
-        with temporary.open("x", encoding="utf-8", newline="\n") as output:
-            json.dump(value, output, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    with _control_access(path):
+        temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+        try:
+            with temporary.open("x", encoding="utf-8", newline="\n") as output:
+                json.dump(value, output, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+                output.write("\n")
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 def _create_state(path: Path, value: object) -> None:
-    try:
-        with path.open("x", encoding="utf-8", newline="\n") as output:
-            json.dump(value, output, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-    except FileExistsError:
-        raise DailyUseError(
-            "already_running",
-            "LifeCase runtime state already exists.",
-            "Run status or stop before retrying start.",
-        ) from None
+    with _control_access(path):
+        try:
+            with path.open("x", encoding="utf-8", newline="\n") as output:
+                json.dump(value, output, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+                output.write("\n")
+                output.flush()
+                os.fsync(output.fileno())
+        except FileExistsError:
+            raise DailyUseError(
+                "already_running",
+                "LifeCase runtime state already exists.",
+                "Run status or stop before retrying start.",
+            ) from None
 
 
 def _acquire_start_lock(path: Path, *, retry_stale: bool = True) -> str:
-    token = secrets.token_hex(32)
-    value = {"format": _START_LOCK_FORMAT, "pid": os.getpid(), "token": token}
-    try:
-        with path.open("x", encoding="utf-8", newline="\n") as output:
-            json.dump(value, output, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        return token
-    except FileExistsError:
+    with _control_access(path):
+        token = secrets.token_hex(32)
+        value = {"format": _START_LOCK_FORMAT, "pid": os.getpid(), "token": token}
         try:
-            if path.is_symlink() or not path.is_file():
-                raise ValueError
-            current = json.loads(path.read_text(encoding="utf-8"))
-            if (
-                not isinstance(current, dict)
-                or current.get("format") != _START_LOCK_FORMAT
-                or not isinstance(current.get("pid"), int)
-                or not isinstance(current.get("token"), str)
-                or len(current["token"]) != 64
-            ):
-                raise ValueError
-        except (OSError, TypeError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
-            raise DailyUseError(
-                "startup_lock_invalid",
-                "The transient LifeCase startup lock is invalid.",
-                "Keep the data intact; inspect the local LifeCase process before retrying.",
-            ) from None
-        if _process_exists(int(current["pid"])):
-            raise DailyUseError(
-                "startup_in_progress",
-                "Another LifeCase startup is already in progress.",
-                "Wait for that startup to finish, then use status before retrying.",
-                retryable=True,
-            ) from None
-        if not retry_stale:
-            raise DailyUseError(
-                "startup_lock_invalid",
-                "The transient LifeCase startup lock could not be recovered safely.",
-                "Keep the data intact; inspect the local LifeCase process before retrying.",
-            ) from None
-        path.unlink()
-        return _acquire_start_lock(path, retry_stale=False)
+            with path.open("x", encoding="utf-8", newline="\n") as output:
+                json.dump(value, output, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+                output.write("\n")
+                output.flush()
+                os.fsync(output.fileno())
+            return token
+        except FileExistsError:
+            try:
+                if path.is_symlink() or not path.is_file():
+                    raise ValueError
+                current = json.loads(path.read_text(encoding="utf-8"))
+                if (
+                    not isinstance(current, dict)
+                    or current.get("format") != _START_LOCK_FORMAT
+                    or not isinstance(current.get("pid"), int)
+                    or not isinstance(current.get("token"), str)
+                    or len(current["token"]) != 64
+                ):
+                    raise ValueError
+            except (OSError, TypeError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+                raise DailyUseError(
+                    "startup_lock_invalid",
+                    "The transient LifeCase startup lock is invalid.",
+                    "Keep the data intact; inspect the local LifeCase process before retrying.",
+                ) from None
+            if _process_exists(int(current["pid"])):
+                raise DailyUseError(
+                    "startup_in_progress",
+                    "Another LifeCase startup is already in progress.",
+                    "Wait for that startup to finish, then use status before retrying.",
+                    retryable=True,
+                ) from None
+            if not retry_stale:
+                raise DailyUseError(
+                    "startup_lock_invalid",
+                    "The transient LifeCase startup lock could not be recovered safely.",
+                    "Keep the data intact; inspect the local LifeCase process before retrying.",
+                ) from None
+            path.unlink()
+            return _acquire_start_lock(path, retry_stale=False)
 
 
 def _release_start_lock(path: Path, token: str) -> None:
-    try:
-        current = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(current, dict) and current.get("token") == token:
-            path.unlink()
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return
+    with _control_access(path):
+        try:
+            current = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(current, dict) and current.get("token") == token:
+                path.unlink()
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return
 
 
 def _remove_runtime_control_files(state_path: Path, stop_path: Path) -> None:
-    state_path.unlink(missing_ok=True)
-    stop_path.unlink(missing_ok=True)
+    with _control_access(state_path):
+        state_path.unlink(missing_ok=True)
+        stop_path.unlink(missing_ok=True)
+
+
+def _remove_owned_control_files(state_path: Path, stop_path: Path, *, pid: int, token: str) -> None:
+    with _control_access(state_path):
+        current = _read_state(state_path, required=False)
+        if current is not None and current["pid"] == pid and current["token"] == token:
+            _remove_runtime_control_files(state_path, stop_path)
 
 
 def _process_exists(pid: int) -> bool:
@@ -704,19 +785,21 @@ def _stop_spawned_process(
     *,
     timeout_seconds: float,
 ) -> None:
-    state = _read_state(state_path, required=False)
-    owns_state = state is not None and int(state["pid"]) == pid
-    if owns_state and state is not None:
-        _atomic_json(stop_path, {"token": state["token"]})
+    state = None
+    # A busy/corrupt control file must not skip stopping the child we just
+    # created. Only the known spawned PID is eligible for this fallback.
+    with suppress(DailyUseError, OSError), _control_access(state_path):
+        state = _read_state(state_path, required=False)
+        if state is not None and state["pid"] == pid:
+            _atomic_json(stop_path, {"token": state["token"]})
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline and _process_exists(pid):
         time.sleep(0.1)
     if _process_exists(pid):
         _terminate_process(pid)
-    if owns_state:
-        current = _read_state(state_path, required=False)
-        if current is not None and int(current["pid"]) == pid:
-            _remove_runtime_control_files(state_path, stop_path)
+    if state is not None and state["pid"] == pid:
+        with suppress(DailyUseError, OSError):
+            _remove_owned_control_files(state_path, stop_path, pid=pid, token=state["token"])
 
 
 def _serve(selected: Path, program_root: Path, static_root: Path, port: int) -> int:
@@ -811,9 +894,7 @@ def _serve(selected: Path, program_root: Path, static_root: Path, port: int) -> 
             )
         )
     with suppress(DailyUseError, OSError):
-        current = _read_state(state_path, required=False)
-        if current is not None and current.get("token") == token:
-            _remove_runtime_control_files(state_path, stop_path)
+        _remove_owned_control_files(state_path, stop_path, pid=state["pid"], token=token)
     _atomic_json(error_path, error.as_dict())
     return 1
 
@@ -849,16 +930,12 @@ async def _serve_and_watch(
             server.should_exit = True
         await asyncio.gather(serve_task, watch_task)
     finally:
-        current = _read_state(state_path, required=False)
-        if current is not None and current.get("token") == token:
-            _remove_runtime_control_files(state_path, stop_path)
+        _remove_owned_control_files(state_path, stop_path, pid=state["pid"], token=token)
 
 
 def _valid_stop_request(path: Path, token: str) -> bool:
-    if not path.exists():
-        return False
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(_read_control_text(path))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return False
     return isinstance(value, dict) and value == {"token": token}

@@ -7,7 +7,7 @@ import sqlite3
 from typing import Any, Literal, NoReturn, cast
 
 from fastapi import APIRouter, status
-from pydantic import BaseModel, JsonValue
+from pydantic import BaseModel, Field, JsonValue
 
 from lifecase.agent import (
     AgentRunRecord,
@@ -27,6 +27,7 @@ from lifecase.agent.demo import (
     PortfolioAgentRunModeError,
     PortfolioAgentRunNotExecutableError,
 )
+from lifecase.agent.models import stage_order_for_run
 from lifecase.api.dependencies import ConfigDependency, DatabaseDependency
 from lifecase.api.errors import ApiError, ApiErrorResponse
 from lifecase.cases import CaseNotFoundError, CaseServiceError
@@ -109,6 +110,14 @@ class AgentAnswerResponse(BaseModel):
     statements: list[str]
     citations: list[dict[str, JsonValue]]
     uncertainty_reason: str | None
+    fact_references: list[dict[str, JsonValue]] = Field(default_factory=list)
+
+
+class AgentAnalysisResponse(BaseModel):
+    question: str
+    basis_sha256: str
+    basis_status: Literal["current", "changed", "unavailable"]
+    facts: list[dict[str, JsonValue]]
 
 
 class AgentToolCallResponse(BaseModel):
@@ -123,6 +132,7 @@ class AgentRunResponse(BaseModel):
     case_id: str
     status: str
     version: int
+    stage_order: list[str]
     current_stage: str | None
     last_completed_stage: str | None
     cancellation_requested: bool
@@ -136,6 +146,7 @@ class AgentRunResponse(BaseModel):
     stages: list[AgentStageTraceResponse]
     claims: list[AgentClaimResponse]
     answer: AgentAnswerResponse | None
+    analysis: AgentAnalysisResponse | None = None
     tool_calls: list[AgentToolCallResponse]
     created_at: str
     updated_at: str
@@ -349,13 +360,23 @@ def agent_run_response(state: PortfolioAgentDemoState) -> AgentRunResponse:
         case_id=run.case_id,
         status=run.status.value,
         version=run.version,
+        stage_order=[stage.value for stage in stage_order_for_run(run.id)],
         current_stage=None if run.current_stage is None else run.current_stage.value,
         last_completed_stage=(
             None if run.last_completed_stage is None else run.last_completed_stage.value
         ),
         cancellation_requested=run.cancellation_requested,
-        can_execute=run.status in {AgentRunStatus.QUEUED, AgentRunStatus.CHECKPOINTED},
-        can_retry=_can_retry(run),
+        can_execute=(
+            run.status in {AgentRunStatus.QUEUED, AgentRunStatus.CHECKPOINTED}
+            and (state.analysis is None or state.analysis["basis_status"] == "current")
+        ),
+        can_retry=(
+            _can_retry(run)
+            and (state.analysis is None or state.analysis["basis_status"] == "current")
+        ),
+        analysis=(
+            None if state.analysis is None else AgentAnalysisResponse.model_validate(state.analysis)
+        ),
         recovery_required=run.status is AgentRunStatus.RUNNING,
         provider=("deterministic_fake" if provider == "fake" else provider),
         model_id=model_id,

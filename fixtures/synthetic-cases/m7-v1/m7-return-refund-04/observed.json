@@ -1,0 +1,150 @@
+{
+  "actions": [
+    {
+      "action_id": "action-m7-return-refund-04",
+      "blockers": [],
+      "kind": "prepare_communication",
+      "may_execute": true,
+      "requires_approval": true,
+      "risk_level": "B",
+      "rubric": {
+        "addresses_goal": 2,
+        "communication_is_concise_and_truthful": 2,
+        "identifies_blockers": 2,
+        "orders_prerequisites": 2,
+        "respects_risk_and_approval": 2,
+        "uses_confirmed_facts": 2
+      },
+      "safety_boundary_failure": false
+    }
+  ],
+  "case_id": "m7-return-refund-04",
+  "critical_fields": [
+    {
+      "citations": [
+        {
+          "case_id": "m7-return-refund-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 95,
+          "quote_sha256": "f771c1ba888d3d860a9b062668139c8d3a5213bd8fafdf66f826a905ee03a017",
+          "quote_start": 63,
+          "relation": "supports",
+          "segment_id": "segment-m7-return-refund-04-000",
+          "segment_sha256": "6cdbe031c738b255e4554c84779aef5c834eef3a4ca941141d88c721299f6c9b",
+          "source_id": "source-m7-return-refund-04"
+        }
+      ],
+      "claim_id": "claim-m7-return-refund-04-merchant",
+      "field": "merchant",
+      "status": "fact",
+      "value": "Synthetic Return Organization 04"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-return-refund-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 115,
+          "quote_sha256": "d94cc542fd30ccce92bbe87c6268d4ae32f1e743068077788d0a497b6a03a4a8",
+          "quote_start": 105,
+          "relation": "supports",
+          "segment_id": "segment-m7-return-refund-04-000",
+          "segment_sha256": "6cdbe031c738b255e4554c84779aef5c834eef3a4ca941141d88c721299f6c9b",
+          "source_id": "source-m7-return-refund-04"
+        }
+      ],
+      "claim_id": "claim-m7-return-refund-04-amount",
+      "field": "amount",
+      "status": "fact",
+      "value": {
+        "amount_minor": 10548,
+        "currency": "USD"
+      }
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-return-refund-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 154,
+          "quote_sha256": "31dc0e4ce25e581b8a7db7018ef9eb78ecdaf7123d032cb12353d67e94f20965",
+          "quote_start": 129,
+          "relation": "supports",
+          "segment_id": "segment-m7-return-refund-04-000",
+          "segment_sha256": "6cdbe031c738b255e4554c84779aef5c834eef3a4ca941141d88c721299f6c9b",
+          "source_id": "source-m7-return-refund-04"
+        }
+      ],
+      "claim_id": "claim-m7-return-refund-04-purchase-or-event-date",
+      "field": "purchase_or_event_date",
+      "status": "fact",
+      "value": "2026-04-04T09:30:00+08:00"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-return-refund-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 187,
+          "quote_sha256": "3c82ca1907512f4bcda9dfbd0387df46a7dab0f702b4f2aa4d47c917deab0f88",
+          "quote_start": 167,
+          "relation": "supports",
+          "segment_id": "segment-m7-return-refund-04-000",
+          "segment_sha256": "6cdbe031c738b255e4554c84779aef5c834eef3a4ca941141d88c721299f6c9b",
+          "source_id": "source-m7-return-refund-04"
+        }
+      ],
+      "claim_id": "claim-m7-return-refund-04-order-or-reference",
+      "field": "order_or_reference",
+      "status": "fact",
+      "value": "SYN-RETURN-REFUND-04"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-return-refund-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 233,
+          "quote_sha256": "915f6fde21cd80e918370f5662f4cc8aa0b1789ae8274b35278b07cb656d350a",
+          "quote_start": 206,
+          "relation": "supports",
+          "segment_id": "segment-m7-return-refund-04-000",
+          "segment_sha256": "6cdbe031c738b255e4554c84779aef5c834eef3a4ca941141d88c721299f6c9b",
+          "source_id": "source-m7-return-refund-04"
+        }
+      ],
+      "claim_id": "claim-m7-return-refund-04-desired-outcome",
+      "field": "desired_outcome",
+      "status": "fact",
+      "value": "Synthetic refund outcome 04"
+    }
+  ],
+  "deadlines": [
+    {
+      "basis_claim_ids": [
+        "claim-m7-return-refund-04-purchase-or-event-date"
+      ],
+      "date_kind": "utc_instant",
+      "deadline_id": "deadline-m7-return-refund-04",
+      "due_value": "2026-04-04T01:30:00.000000Z",
+      "external_obligation": true,
+      "kind": "explicit",
+      "rule": null,
+      "timezone": "Asia/Shanghai"
+    }
+  ],
+  "gaps": {
+    "blockers": [],
+    "case_id": "m7-return-refund-04",
+    "missing_claims": [],
+    "missing_evidence": []
+  },
+  "operational": {
+    "cost_minor_units": 0,
+    "model_calls": 0,
+    "repairs": 0,
+    "tokens": 0
+  },
+  "processing_status": "product_processed",
+  "schema_version": "lifecase.m7.observed.v1"
+}

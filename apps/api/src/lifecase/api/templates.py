@@ -16,6 +16,13 @@ class TemplateEvidenceRequirementResponse(BaseModel):
     description: str
 
 
+class TemplateConditionalClaimResponse(BaseModel):
+    """One available field that is required only under its existing condition."""
+
+    when: str
+    field: str
+
+
 class TemplateCatalogResponse(BaseModel):
     """One reviewed selectable Case type and its immutable template identity."""
 
@@ -25,6 +32,7 @@ class TemplateCatalogResponse(BaseModel):
     title: str
     goal_options: list[str]
     required_claims: list[str]
+    conditional_claims: list[TemplateConditionalClaimResponse]
     evidence_requirements: list[TemplateEvidenceRequirementResponse]
     content_sha256: str
 
@@ -50,6 +58,10 @@ def list_templates() -> list[TemplateCatalogResponse]:
             title=item.title,
             goal_options=list(item.goal_options),
             required_claims=list(item.required_claims),
+            conditional_claims=[
+                TemplateConditionalClaimResponse(when=condition.when, field=condition.field)
+                for condition in item.conditional_claims
+            ],
             evidence_requirements=[
                 TemplateEvidenceRequirementResponse(
                     key=requirement.key,

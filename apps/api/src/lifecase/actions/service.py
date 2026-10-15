@@ -7,11 +7,13 @@ import json
 import sqlite3
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import uuid4
 
 from lifecase.cases.models import CaseRecord
 from lifecase.cases.service import CaseNotFoundError, CasePersistenceError, CaseService
-from lifecase.claims.models import ClaimStatus, ClaimValue
+from lifecase.claims.models import ClaimEventType, ClaimStatus, ClaimValue
+from lifecase.claims.service import ClaimService, ClaimServiceError
 from lifecase.deadlines.models import DeadlineRecord
 from lifecase.deadlines.service import DeadlineService, DeadlineServiceError
 from lifecase.templates.registry import BUILT_IN_TEMPLATE_REGISTRY, TemplateRegistryError
@@ -105,85 +107,34 @@ class ActionService:
     def __init__(self, connection: sqlite3.Connection) -> None:
         self._connection = connection
 
+    @staticmethod
+    def _analysis_bound(payload: ActionPayload) -> bool:
+        return "analysis_run_id" in payload.to_dict()
+
+    def require_current_analysis(self, action: ActionRecord) -> None:
+        """Historical text stays readable; use of its authority must be current."""
+        from .analysis_draft import AnalysisDraftStaleError, require_current_analysis_action
+
+        try:
+            require_current_analysis_action(self._connection, action.case_id, action.payload)
+        except AnalysisDraftStaleError as error:
+            raise ActionIntegrityError("Action analysis basis has changed") from error
+
+    def _analysis_status(
+        self, case_id: str, payload: ActionPayload
+    ) -> Literal["current", "changed", "unavailable"] | None:
+        from .analysis_draft import analysis_action_status
+
+        return analysis_action_status(self._connection, case_id, payload)
+
     def create_action(self, command: CreateActionCommand) -> ActionRecord:
         """Create one Action and all owned authority rows atomically."""
 
+        if self._analysis_bound(command.payload):
+            raise ActionTransitionNotAllowedError("Use the explicit analysis draft save")
         try:
             self._connection.execute("BEGIN IMMEDIATE")
-            case = self._require_case(command.case_id)
-            template = BUILT_IN_TEMPLATE_REGISTRY.load_exact(
-                case_type=case.type,
-                template_id=case.template_id,
-                template_version=case.template_version,
-            )
-            requirements = self._validate_requirements(command, template.required_claims)
-            dependencies = self._validate_dependencies(command)
-            deadline = self._validate_deadline(command)
-            blockers = self._derive_create_blockers(
-                command,
-                requirements=requirements,
-                dependencies=dependencies,
-                required_fields=template.required_claims,
-                evidence_keys=tuple(item.key for item in template.evidence_requirements),
-            )
-            blockers_json, blockers_sha256 = _canonical_blockers(blockers)
-            status = ActionStatus.BLOCKED if blockers else ActionStatus.READY
-            action_id = _new_id("action")
-            occurred_at = _utc_now()
-            self._connection.execute(
-                """
-                INSERT INTO action (
-                    id, case_id, kind, status, risk_level, payload_json,
-                    payload_sha256, blockers_json, blockers_sha256, version,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-                """,
-                (
-                    action_id,
-                    command.case_id,
-                    command.kind.value,
-                    status.value,
-                    command.risk_level.value,
-                    command.payload.json_text,
-                    command.payload.sha256,
-                    blockers_json,
-                    blockers_sha256,
-                    occurred_at,
-                    occurred_at,
-                ),
-            )
-            self._insert_requirements(action_id, command.case_id, requirements)
-            self._insert_dependencies(action_id, command.case_id, command, dependencies)
-            if deadline is not None and command.deadline is not None:
-                self._connection.execute(
-                    """
-                    INSERT INTO action_deadline (
-                        action_id, case_id, deadline_id, deadline_version,
-                        definition_sha256
-                    ) VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        action_id,
-                        command.case_id,
-                        deadline.deadline_id,
-                        command.deadline.expected_deadline_version,
-                        command.deadline.definition_sha256,
-                    ),
-                )
-            self._insert_event(
-                action_id=action_id,
-                case_id=command.case_id,
-                event_type=ActionEventType.CREATED,
-                prior_status=None,
-                new_status=status,
-                prior_version=0,
-                new_version=1,
-                payload_sha256=command.payload.sha256,
-                blockers_sha256=blockers_sha256,
-                actor=command.actor,
-                reason=command.reason,
-                occurred_at=occurred_at,
-            )
+            action_id = self._create_action_in_transaction(command)
             self._connection.execute("COMMIT")
         except ActionServiceError:
             self._rollback()
@@ -198,6 +149,86 @@ class ActionService:
             self._rollback()
             raise ActionPersistenceError("Action creation was rolled back") from error
         return self.get_action(action_id)
+
+    def _create_action_in_transaction(self, command: CreateActionCommand) -> str:
+        """Share the existing atomic insert with the explicit analysis save."""
+        if not self._connection.in_transaction:
+            raise ActionPersistenceError("Action creation requires a transaction")
+        case = self._require_case(command.case_id)
+        template = BUILT_IN_TEMPLATE_REGISTRY.load_exact(
+            case_type=case.type,
+            template_id=case.template_id,
+            template_version=case.template_version,
+        )
+        requirements = self._validate_requirements(command, template.required_claims)
+        dependencies = self._validate_dependencies(command)
+        deadline = self._validate_deadline(command)
+        blockers = self._derive_create_blockers(
+            command,
+            requirements=requirements,
+            dependencies=dependencies,
+            required_fields=template.required_claims,
+            evidence_keys=tuple(item.key for item in template.evidence_requirements),
+        )
+        blockers_json, blockers_sha256 = _canonical_blockers(blockers)
+        status = ActionStatus.BLOCKED if blockers else ActionStatus.READY
+        action_id = _new_id("action")
+        occurred_at = _utc_now()
+        self._connection.execute(
+            """
+            INSERT INTO action (
+                id, case_id, kind, status, risk_level, payload_json,
+                payload_sha256, blockers_json, blockers_sha256, version,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+            """,
+            (
+                action_id,
+                command.case_id,
+                command.kind.value,
+                status.value,
+                command.risk_level.value,
+                command.payload.json_text,
+                command.payload.sha256,
+                blockers_json,
+                blockers_sha256,
+                occurred_at,
+                occurred_at,
+            ),
+        )
+        self._insert_requirements(action_id, command.case_id, requirements)
+        self._insert_dependencies(action_id, command.case_id, command, dependencies)
+        if deadline is not None and command.deadline is not None:
+            self._connection.execute(
+                """
+                INSERT INTO action_deadline (
+                    action_id, case_id, deadline_id, deadline_version,
+                    definition_sha256
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    action_id,
+                    command.case_id,
+                    deadline.deadline_id,
+                    command.deadline.expected_deadline_version,
+                    command.deadline.definition_sha256,
+                ),
+            )
+        self._insert_event(
+            action_id=action_id,
+            case_id=command.case_id,
+            event_type=ActionEventType.CREATED,
+            prior_status=None,
+            new_status=status,
+            prior_version=0,
+            new_version=1,
+            payload_sha256=command.payload.sha256,
+            blockers_sha256=blockers_sha256,
+            actor=command.actor,
+            reason=command.reason,
+            occurred_at=occurred_at,
+        )
+        return action_id
 
     def get_action(self, action_id: str) -> ActionRecord:
         """Read and revalidate one Action in a stable transaction."""
@@ -354,96 +385,9 @@ class ActionService:
         definition = command.definition
         try:
             current = self._begin_mutation_raw(command.action_id, command.expected_version)
-            if current.status not in {
-                ActionStatus.PROPOSED,
-                ActionStatus.BLOCKED,
-                ActionStatus.READY,
-                ActionStatus.APPROVED,
-            }:
-                raise ActionTransitionNotAllowedError
-            if definition.case_id != current.case_id:
-                raise ActionRequirementInvalidError("Action revision crossed Case scope")
-            case = self._require_case(current.case_id)
-            template = BUILT_IN_TEMPLATE_REGISTRY.load_exact(
-                case_type=case.type,
-                template_id=case.template_id,
-                template_version=case.template_version,
-            )
-            requirements = self._validate_requirements(definition, template.required_claims)
-            dependencies = self._validate_dependencies(definition)
-            if any(item.action_id == current.id for item in dependencies):
-                raise ActionDependencyInvalidError("Action dependency graph is invalid")
-            self._validate_revised_graph(current.id, current.case_id, dependencies)
-            deadline = self._validate_deadline(definition)
-            blockers = self._derive_create_blockers(
-                definition,
-                requirements=requirements,
-                dependencies=dependencies,
-                required_fields=template.required_claims,
-                evidence_keys=tuple(item.key for item in template.evidence_requirements),
-            )
-            blockers_json, blockers_sha256 = _canonical_blockers(blockers)
-            new_status = ActionStatus.BLOCKED if blockers else ActionStatus.READY
-            new_version = current.version + 1
-            occurred_at = _utc_now()
-            self._invalidate_active_approvals(
-                current.id,
-                current.case_id,
-                definition.actor,
-                definition.reason,
-                occurred_at,
-            )
-            self._connection.execute(
-                "DELETE FROM action_requirement_claim WHERE action_id = ?", (current.id,)
-            )
-            self._connection.execute(
-                "DELETE FROM action_dependency WHERE action_id = ?", (current.id,)
-            )
-            self._connection.execute(
-                "DELETE FROM action_deadline WHERE action_id = ?", (current.id,)
-            )
-            self._insert_requirements(current.id, current.case_id, requirements)
-            self._insert_dependencies(current.id, current.case_id, definition, dependencies)
-            if deadline is not None and definition.deadline is not None:
-                self._connection.execute(
-                    """
-                    INSERT INTO action_deadline (
-                        action_id, case_id, deadline_id, deadline_version, definition_sha256
-                    ) VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        current.id,
-                        current.case_id,
-                        deadline.deadline_id,
-                        definition.deadline.expected_deadline_version,
-                        definition.deadline.definition_sha256,
-                    ),
-                )
-            self._update_action(
-                current=current,
-                kind=definition.kind,
-                status=new_status,
-                risk_level=definition.risk_level,
-                payload=definition.payload,
-                blockers_json=blockers_json,
-                blockers_sha256=blockers_sha256,
-                new_version=new_version,
-                updated_at=occurred_at,
-            )
-            self._insert_event(
-                action_id=current.id,
-                case_id=current.case_id,
-                event_type=ActionEventType.REVISED,
-                prior_status=current.status,
-                new_status=new_status,
-                prior_version=current.version,
-                new_version=new_version,
-                payload_sha256=definition.payload.sha256,
-                blockers_sha256=blockers_sha256,
-                actor=definition.actor,
-                reason=definition.reason,
-                occurred_at=occurred_at,
-            )
+            if self._analysis_bound(current.payload) or self._analysis_bound(definition.payload):
+                raise ActionTransitionNotAllowedError("Use the explicit analysis draft save")
+            self._revise_action_in_transaction(command, current)
             self._connection.execute("COMMIT")
         except ActionServiceError:
             self._rollback()
@@ -458,6 +402,100 @@ class ActionService:
             self._rollback()
             raise ActionPersistenceError("Action revision was rolled back") from error
         return self.get_action(command.action_id)
+
+    def _revise_action_in_transaction(
+        self, command: ReviseActionCommand, current: ActionRecord
+    ) -> None:
+        """Reuse the ordinary versioned revision after a scoped draft save check."""
+        if not self._connection.in_transaction:
+            raise ActionPersistenceError("Action revision requires a transaction")
+        definition = command.definition
+        if current.status not in {
+            ActionStatus.PROPOSED,
+            ActionStatus.BLOCKED,
+            ActionStatus.READY,
+            ActionStatus.APPROVED,
+        }:
+            raise ActionTransitionNotAllowedError
+        if definition.case_id != current.case_id:
+            raise ActionRequirementInvalidError("Action revision crossed Case scope")
+        case = self._require_case(current.case_id)
+        template = BUILT_IN_TEMPLATE_REGISTRY.load_exact(
+            case_type=case.type,
+            template_id=case.template_id,
+            template_version=case.template_version,
+        )
+        requirements = self._validate_requirements(definition, template.required_claims)
+        dependencies = self._validate_dependencies(definition)
+        if any(item.action_id == current.id for item in dependencies):
+            raise ActionDependencyInvalidError("Action dependency graph is invalid")
+        self._validate_revised_graph(current.id, current.case_id, dependencies)
+        deadline = self._validate_deadline(definition)
+        blockers = self._derive_create_blockers(
+            definition,
+            requirements=requirements,
+            dependencies=dependencies,
+            required_fields=template.required_claims,
+            evidence_keys=tuple(item.key for item in template.evidence_requirements),
+        )
+        blockers_json, blockers_sha256 = _canonical_blockers(blockers)
+        new_status = ActionStatus.BLOCKED if blockers else ActionStatus.READY
+        new_version = current.version + 1
+        occurred_at = _utc_now()
+        self._invalidate_active_approvals(
+            current.id,
+            current.case_id,
+            definition.actor,
+            definition.reason,
+            occurred_at,
+        )
+        self._connection.execute(
+            "DELETE FROM action_requirement_claim WHERE action_id = ?", (current.id,)
+        )
+        self._connection.execute("DELETE FROM action_dependency WHERE action_id = ?", (current.id,))
+        self._connection.execute("DELETE FROM action_deadline WHERE action_id = ?", (current.id,))
+        self._insert_requirements(current.id, current.case_id, requirements)
+        self._insert_dependencies(current.id, current.case_id, definition, dependencies)
+        if deadline is not None and definition.deadline is not None:
+            self._connection.execute(
+                """
+                INSERT INTO action_deadline (
+                    action_id, case_id, deadline_id, deadline_version, definition_sha256
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    current.id,
+                    current.case_id,
+                    deadline.deadline_id,
+                    definition.deadline.expected_deadline_version,
+                    definition.deadline.definition_sha256,
+                ),
+            )
+        self._update_action(
+            current=current,
+            kind=definition.kind,
+            status=new_status,
+            risk_level=definition.risk_level,
+            payload=definition.payload,
+            blockers_json=blockers_json,
+            blockers_sha256=blockers_sha256,
+            new_version=new_version,
+            updated_at=occurred_at,
+        )
+        self._insert_event(
+            action_id=current.id,
+            case_id=current.case_id,
+            event_type=ActionEventType.REVISED,
+            prior_status=current.status,
+            new_status=new_status,
+            prior_version=current.version,
+            new_version=new_version,
+            payload_sha256=definition.payload.sha256,
+            blockers_sha256=blockers_sha256,
+            actor=definition.actor,
+            reason=definition.reason,
+            occurred_at=occurred_at,
+        )
 
     def revalidate(self, command: ActionStatusCommand) -> ActionRecord:
         """Refresh dependency versions and blockers against current authority."""
@@ -570,7 +608,7 @@ class ActionService:
         )
 
     def cancel(self, command: ActionStatusCommand) -> ActionRecord:
-        current = self._mutating_record(command)
+        current = self._mutating_record(command, allow_stale_analysis=True)
         if current.status not in {
             ActionStatus.PROPOSED,
             ActionStatus.BLOCKED,
@@ -610,6 +648,12 @@ class ActionService:
                 self._validate_completion_evidence(current.case_id, item)
                 for item in command.evidence
             )
+            if self._analysis_bound(current.payload):
+                for item in command.evidence:
+                    if item.authority_type is CompletionAuthorityType.CLAIM:
+                        # The completed record must remain readable under the same
+                        # immutable analysis snapshot checked before this commit.
+                        self._historical_completion_claim(current.case_id, item, current.payload)
             self._connection.executemany(
                 """
                 INSERT INTO action_completion_evidence (
@@ -651,7 +695,9 @@ class ActionService:
         except CasePersistenceError as error:
             raise ActionPersistenceError("Action Case authority could not be read") from error
 
-    def _begin_mutation(self, action_id: str, expected_version: int) -> ActionRecord:
+    def _begin_mutation(
+        self, action_id: str, expected_version: int, *, allow_stale_analysis: bool = False
+    ) -> ActionRecord:
         self._require_idle("Action mutation requires an idle connection")
         self._connection.execute("BEGIN IMMEDIATE")
         row = self._connection.execute(
@@ -668,6 +714,8 @@ class ActionService:
         current = self._read_one_action(row)
         if current.version != expected_version:
             raise ActionVersionConflictError(current.version)
+        if not allow_stale_analysis:
+            self.require_current_analysis(current)
         return current
 
     def _begin_mutation_raw(self, action_id: str, expected_version: int) -> ActionRecord:
@@ -695,6 +743,7 @@ class ActionService:
         )
         if current.version != expected_version:
             raise ActionVersionConflictError(current.version)
+        self.require_current_analysis(current)
         return current
 
     def _base_record(self, row: sqlite3.Row) -> ActionRecord:
@@ -723,9 +772,15 @@ class ActionService:
             updated_at=str(row["updated_at"]),
         )
 
-    def _mutating_record(self, command: ActionStatusCommand) -> ActionRecord:
+    def _mutating_record(
+        self, command: ActionStatusCommand, *, allow_stale_analysis: bool = False
+    ) -> ActionRecord:
         try:
-            return self._begin_mutation(command.action_id, command.expected_version)
+            return self._begin_mutation(
+                command.action_id,
+                command.expected_version,
+                allow_stale_analysis=allow_stale_analysis,
+            )
         except ActionServiceError:
             self._rollback()
             raise
@@ -789,6 +844,7 @@ class ActionService:
 
         if not self._connection.in_transaction:
             raise ActionPersistenceError("Action approval requires a transaction")
+        self.require_current_analysis(current)
         if current.status is not ActionStatus.READY or current.risk_level not in {
             ActionRiskLevel.B,
             ActionRiskLevel.C,
@@ -1237,7 +1293,7 @@ class ActionService:
                 sha256=str(row["payload_sha256"]),
             )
             blockers = _parse_blockers(str(row["blockers_json"]), str(row["blockers_sha256"]))
-            requirements = self._read_requirements(action_id, case_id)
+            requirements = self._read_requirements(action_id, case_id, payload=payload)
             dependencies = tuple(
                 ActionDependency(
                     action_id=dependency_id,
@@ -1247,7 +1303,13 @@ class ActionService:
                 for dependency_id, expected_version in dependencies_by_id[action_id]
             )
             deadline = self._read_deadline(action_id, deadlines)
-            completion_evidence = self._read_completion_evidence(action_id, case_id)
+            completion_evidence = self._read_completion_evidence(
+                action_id,
+                case_id,
+                historical_payload=payload
+                if str(row["status"]) == ActionStatus.DONE.value
+                else None,
+            )
             version = int(row["version"])
             status = ActionStatus(str(row["status"]))
             self._validate_history(
@@ -1275,6 +1337,7 @@ class ActionService:
                 version=version,
                 created_at=str(row["created_at"]),
                 updated_at=str(row["updated_at"]),
+                analysis_basis_status=self._analysis_status(case_id, payload),
             )
         return tuple(records[action_id] for action_id in ordered_ids)
 
@@ -1306,7 +1369,7 @@ class ActionService:
         _topological_order(all_rows, graph)
 
         current = self._base_record(row)
-        requirements = self._read_requirements(action_id, case_id)
+        requirements = self._read_requirements(action_id, case_id, payload=current.payload)
         dependency_rows = self._connection.execute(
             """
             SELECT d.depends_on_action_id, d.depends_on_action_version,
@@ -1332,7 +1395,11 @@ class ActionService:
             case_id
         )
         deadline = self._read_deadline(action_id, {item.id: item for item in deadline_records})
-        evidence = self._read_completion_evidence(action_id, case_id)
+        evidence = self._read_completion_evidence(
+            action_id,
+            case_id,
+            historical_payload=current.payload if current.status is ActionStatus.DONE else None,
+        )
         self._validate_history(
             action_id=action_id,
             case_id=case_id,
@@ -1358,6 +1425,7 @@ class ActionService:
             version=current.version,
             created_at=current.created_at,
             updated_at=current.updated_at,
+            analysis_basis_status=self._analysis_status(case_id, current.payload),
         )
 
     def _read_dependency_rows(
@@ -1383,7 +1451,11 @@ class ActionService:
             result[action_id] = tuple(dependencies)
         return result
 
-    def _read_requirements(self, action_id: str, case_id: str) -> tuple[ActionRequirement, ...]:
+    def _read_requirements(
+        self, action_id: str, case_id: str, *, payload: ActionPayload | None = None
+    ) -> tuple[ActionRequirement, ...]:
+        if payload is not None and self._analysis_bound(payload):
+            return self._read_analysis_requirements(action_id, case_id, payload)
         rows = self._connection.execute(
             """
             SELECT r.claim_id, r.claim_version, r.value_sha256, r.field,
@@ -1425,6 +1497,41 @@ class ActionService:
             )
         return tuple(result)
 
+    def _read_analysis_requirements(
+        self, action_id: str, case_id: str, payload: ActionPayload
+    ) -> tuple[ActionRequirement, ...]:
+        from .analysis_draft import analysis_action_facts
+
+        facts = analysis_action_facts(self._connection, case_id, payload)
+        assert facts is not None
+        by_id = {str(item["claim_id"]): item for item in facts}
+        result: list[ActionRequirement] = []
+        for row in self._connection.execute(
+            "SELECT r.*, c.case_id AS claim_case_id FROM action_requirement_claim r "
+            "JOIN claim c ON c.id = r.claim_id WHERE r.action_id = ? ORDER BY r.position",
+            (action_id,),
+        ).fetchall():
+            fact = by_id.get(str(row["claim_id"]))
+            if (
+                row["case_id"] != case_id
+                or row["claim_case_id"] != case_id
+                or fact is None
+                or fact["usable_as_fact"] is not True
+                or fact["field"] != row["field"]
+                or fact["version"] != row["claim_version"]
+                or fact["value_sha256"] != row["value_sha256"]
+            ):
+                raise ActionIntegrityError("Action historical Claim binding is invalid")
+            result.append(
+                ActionRequirement(
+                    claim_id=str(row["claim_id"]),
+                    claim_version=int(row["claim_version"]),
+                    value_sha256=str(row["value_sha256"]),
+                    field=str(row["field"]),
+                )
+            )
+        return tuple(result)
+
     def _read_deadline(
         self, action_id: str, deadlines: Mapping[str, DeadlineRecord]
     ) -> ActionDeadline | None:
@@ -1455,7 +1562,7 @@ class ActionService:
         )
 
     def _read_completion_evidence(
-        self, action_id: str, case_id: str
+        self, action_id: str, case_id: str, *, historical_payload: ActionPayload | None = None
     ) -> tuple[ActionCompletionEvidence, ...]:
         rows = self._connection.execute(
             """
@@ -1465,21 +1572,145 @@ class ActionService:
             """,
             (action_id, case_id),
         ).fetchall()
-        return tuple(
-            self._validate_completion_evidence(
-                case_id,
-                CompletionEvidenceInput(
-                    authority_type=CompletionAuthorityType(str(row["authority_type"])),
-                    authority_id=str(row["authority_id"]),
-                    expected_version=(
-                        int(row["authority_version"])
-                        if row["authority_version"] is not None
-                        else None
-                    ),
-                    authority_sha256=str(row["authority_sha256"]),
+        result: list[ActionCompletionEvidence] = []
+        for row in rows:
+            item = CompletionEvidenceInput(
+                authority_type=CompletionAuthorityType(str(row["authority_type"])),
+                authority_id=str(row["authority_id"]),
+                expected_version=(
+                    int(row["authority_version"]) if row["authority_version"] is not None else None
                 ),
+                authority_sha256=str(row["authority_sha256"]),
             )
-            for row in rows
+            if (
+                historical_payload is not None
+                and self._analysis_bound(historical_payload)
+                and item.authority_type is CompletionAuthorityType.CLAIM
+            ):
+                result.append(self._historical_completion_claim(case_id, item, historical_payload))
+            else:
+                result.append(self._validate_completion_evidence(case_id, item))
+        return tuple(result)
+
+    def _historical_completion_claim(
+        self, case_id: str, item: CompletionEvidenceInput, payload: ActionPayload
+    ) -> ActionCompletionEvidence:
+        """Read a completed analysis Action's exact Claim snapshot without rebasing it."""
+        from .analysis_draft import analysis_action_facts
+
+        facts = analysis_action_facts(self._connection, case_id, payload)
+        fact = next((fact for fact in facts or () if fact["claim_id"] == item.authority_id), None)
+        if (
+            fact is None
+            or fact["usable_as_fact"] is not True
+            or fact["version"] != item.expected_version
+            or fact["value_sha256"] != item.authority_sha256
+        ):
+            raise ActionIntegrityError("Historical completion Claim is not in the analysis basis")
+        try:
+            service = ClaimService(self._connection)
+            claim = service.get_claim(item.authority_id)
+            events = service.list_claim_events(claim.id)
+            if claim.case_id != case_id or len(events) != claim.version or not events:
+                raise ActionIntegrityError(
+                    "Historical completion Claim scope or history is invalid"
+                )
+            for position, event in enumerate(events):
+                prior = events[position - 1] if position else None
+                if (
+                    event.prior_version != position
+                    or event.new_version != position + 1
+                    or event.prior_status != (prior.new_status if prior else None)
+                    or event.prior_value != (prior.new_value if prior else None)
+                    or (position == 0) != (event.event_type is ClaimEventType.CREATED)
+                ):
+                    raise ActionIntegrityError("Historical completion Claim chain is invalid")
+                if (
+                    event.event_type is ClaimEventType.CONFIRMED
+                    and event.new_status is not ClaimStatus.CONFIRMED
+                    or event.event_type is ClaimEventType.CORRECTED
+                    and event.new_status is not ClaimStatus.CORRECTED
+                    or event.event_type is ClaimEventType.REJECTED
+                    and event.new_status is not ClaimStatus.REJECTED
+                    or event.event_type is ClaimEventType.SOURCE_ATTACHED
+                    and (
+                        event.new_status != event.prior_status
+                        or event.new_value != event.prior_value
+                    )
+                ):
+                    raise ActionIntegrityError("Historical completion Claim event is invalid")
+            last = events[-1]
+            version = item.expected_version
+            assert version is not None
+            if (
+                last.new_value != claim.value
+                or last.new_status is not claim.status
+                or version > len(events)
+                or events[version - 1].new_value.sha256 != item.authority_sha256
+                or events[version - 1].new_status.value != fact["status"]
+                or events[version - 1].new_status not in _AUTHORITATIVE_CLAIM_STATUSES
+            ):
+                raise ActionIntegrityError("Historical completion Claim version is inconsistent")
+            confirmation = fact["confirmation"]
+            if fact["confirmation_basis"] == "correction":
+                matching = next(
+                    (
+                        event
+                        for event in reversed(events[:version])
+                        if event.event_type is ClaimEventType.CORRECTED
+                        and event.new_value.sha256 == item.authority_sha256
+                    ),
+                    None,
+                )
+                metadata = (
+                    None
+                    if matching is None
+                    else {
+                        "actor": matching.actor,
+                        "reason": matching.reason,
+                        "occurred_at": matching.occurred_at,
+                    }
+                )
+            else:
+                recorded = next(
+                    (
+                        confirmation
+                        for confirmation in reversed(service.list_claim_confirmations(claim.id))
+                        if confirmation.claim_version <= version
+                        and confirmation.value_sha256 == item.authority_sha256
+                        and confirmation.basis.value == fact["confirmation_basis"]
+                    ),
+                    None,
+                )
+                metadata = (
+                    None
+                    if recorded is None
+                    else {
+                        "actor": recorded.actor,
+                        "reason": recorded.reason,
+                        "occurred_at": recorded.confirmed_at,
+                    }
+                )
+            if confirmation != metadata or metadata is None:
+                raise ActionIntegrityError("Historical completion confirmation is inconsistent")
+            citations = fact["citations"]
+            if not isinstance(citations, list):
+                raise ActionIntegrityError("Historical completion sources are invalid")
+            for citation in citations:
+                if (
+                    not isinstance(citation, dict)
+                    or self._connection.execute(
+                        "SELECT 1 FROM source s JOIN source_segment ss ON ss.source_id = s.id "
+                        "WHERE s.case_id = ? AND s.id = ? AND ss.id = ?",
+                        (case_id, citation["source_id"], citation["segment_id"]),
+                    ).fetchone()
+                    is None
+                ):
+                    raise ActionIntegrityError("Historical completion source scope is invalid")
+        except ClaimServiceError as error:
+            raise ActionIntegrityError("Historical completion Claim cannot be read") from error
+        return ActionCompletionEvidence(
+            item.authority_type, item.authority_id, item.expected_version, item.authority_sha256
         )
 
     def _communication_draft(
@@ -1490,6 +1721,8 @@ class ActionService:
         if payload.kind is not ActionKind.PREPARE_COMMUNICATION:
             return None
         metadata = payload.to_dict()
+        if "draft_text" in metadata:
+            return metadata["draft_text"]
         lines = [
             f"Intent: {metadata['intent']}",
             f"Recipient role: {metadata['recipient_role']}",

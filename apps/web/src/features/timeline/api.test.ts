@@ -7,6 +7,7 @@ import {
   timelineKindLabel,
   timelineOriginLabel,
   timelineView,
+  timelineEventLabel,
 } from "./presenters";
 import type { TimelineEvent, TimelineResult } from "./types";
 
@@ -87,5 +88,22 @@ describe("Timeline presentation", () => {
     expect(timelineOriginLabel(event.origin)).toBe("已记录操作者");
     expect(eventStatus(event)).toBe("intake → needs_review");
     expect(shortAuthority(event.authority_id)).toBe("transiti…erence");
+  });
+
+  it("names saved work and analysis events in Chinese without changing their statuses", () => {
+    expect(timelineKindLabel("action_created")).toBe("待办已建立");
+    expect(timelineKindLabel("action_completed")).toBe("待办已完成");
+    expect(timelineKindLabel("action_failed")).toBe("待办已记录失败");
+    expect(timelineKindLabel("agent_run_status")).toBe("分析状态");
+    expect(timelineKindLabel("agent_stage_status")).toBe("分析步骤状态");
+    expect(timelineOriginLabel("agent")).toBe("智能分析");
+    expect(eventStatus({ ...event, kind: "action_failed", prior_status: "running", status: "failed" })).toBe("running → failed");
+  });
+
+  it("presents recorded manual results without implying Action completion", () => {
+    const progress = { ...event, kind: "action_progress_recorded" as const, label: "result", status: null, prior_status: null };
+    expect(timelineKindLabel(progress.kind)).toBe("人工处理记录已保存");
+    expect(timelineEventLabel(progress)).toBe("人工结果备注（不代表待办完成）");
+    expect(eventStatus(progress)).toBeNull();
   });
 });

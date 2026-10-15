@@ -4,6 +4,7 @@ import type {
   TimelineLoadState,
   TimelineView,
 } from "./types";
+import { requirementLabel } from "../workbench/presenters";
 
 const kindLabels: Record<TimelineEventKind, string> = {
   source_imported: "材料已导入",
@@ -15,21 +16,22 @@ const kindLabels: Record<TimelineEventKind, string> = {
   claim_confirmed: "事实已确认",
   claim_corrected: "事实已纠正",
   claim_rejected: "事实已拒绝",
-  agent_run_status: "Agent 流程状态",
-  agent_stage_status: "Agent 阶段状态",
+  agent_run_status: "分析状态",
+  agent_stage_status: "分析步骤状态",
   deadline_created: "截止日期已建立",
   deadline_confirmed: "截止日期已确认",
   deadline_passed: "截止日期已标记过期",
   deadline_completed: "截止日期已完成",
   deadline_dismissed: "截止日期已忽略",
-  action_created: "Action 已建立",
-  action_revised: "Action 已修订",
-  action_revalidated: "Action 已重新校验",
-  action_started: "Action 已开始",
-  action_completed: "Action 已完成",
-  action_failed: "Action 已记录失败",
-  action_cancelled: "Action 已取消",
-  action_approved: "Action 已批准",
+  action_created: "待办已建立",
+  action_revised: "待办已修订",
+  action_revalidated: "待办已重新校验",
+  action_started: "待办已开始",
+  action_completed: "待办已完成",
+  action_failed: "待办已记录失败",
+  action_cancelled: "待办已取消",
+  action_approved: "待办已批准",
+  action_progress_recorded: "人工处理记录已保存",
   approval_requested: "审批已请求",
   approval_approved: "审批已批准",
   approval_rejected: "审批已拒绝",
@@ -41,7 +43,7 @@ const originLabels: Record<TimelineEvent["origin"], string> = {
   local_import: "本地导入",
   extractor: "本地提取器",
   recorded_actor: "已记录操作者",
-  agent: "Agent",
+  agent: "智能分析",
   artifact_service: "产物服务",
 };
 
@@ -85,4 +87,9 @@ export function eventStatus(event: TimelineEvent): string | null {
     return `${event.prior_status} → ${event.status}`;
   }
   return event.status;
+}
+
+export function timelineEventLabel(event: TimelineEvent): string | null {
+  if (event.kind === "action_progress_recorded") return event.label === "result" ? "人工结果备注（不代表待办完成）" : "人工处理进展";
+  return event.authority_type === "claim_event" && event.label ? requirementLabel(event.label) : event.label;
 }

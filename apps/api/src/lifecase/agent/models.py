@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from lifecase.agent.errors import AgentValidationError
+from lifecase.agent.question_binding import QUESTION_RUN_PREFIX, validate_run_binding
 from lifecase.providers.models import canonical_json_object, request_scope_sha256
 
 MAX_CHECKPOINT_BYTES = 65_536
@@ -36,6 +37,15 @@ class AgentStageName(StrEnum):
 
 
 STAGE_ORDER: tuple[AgentStageName, ...] = tuple(AgentStageName)
+TWO_STAGE_ORDER = (AgentStageName.EXTRACT, AgentStageName.VALIDATE)
+LIVE_TWO_STAGE_RUN_PREFIX = "portfolio-live-v2-"
+
+
+def stage_order_for_run(run_id: str) -> tuple[AgentStageName, ...]:
+    """The persisted ID distinguishes new production runs, including queued ones."""
+    if run_id.startswith(QUESTION_RUN_PREFIX):
+        return (AgentStageName.VALIDATE,)
+    return TWO_STAGE_ORDER if run_id.startswith(LIVE_TWO_STAGE_RUN_PREFIX) else STAGE_ORDER
 
 
 class AgentRunStatus(StrEnum):
@@ -144,6 +154,8 @@ class CreateAgentRunCommand:
     case_id: str
     budget: AgentBudget = field(default_factory=AgentBudget)
     allow_case_history: bool = False
+    input_binding_json: str | None = None
+    input_binding_sha256: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "run_id", _identifier(self.run_id, "Run ID"))
@@ -152,6 +164,9 @@ class CreateAgentRunCommand:
             raise AgentValidationError("Agent budget is invalid")
         if not isinstance(self.allow_case_history, bool):
             raise AgentValidationError("Agent run history setting is invalid")
+        validate_run_binding(
+            self.run_id, self.case_id, self.input_binding_json, self.input_binding_sha256
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,6 +356,8 @@ class AgentRunRecord:
     updated_at: str
     completed_at: str | None
     stages: tuple[AgentStageRecord, ...]
+    input_binding_json: str | None = None
+    input_binding_sha256: str | None = None
 
 
 def checkpoint_payload(value: object) -> tuple[str, str]:

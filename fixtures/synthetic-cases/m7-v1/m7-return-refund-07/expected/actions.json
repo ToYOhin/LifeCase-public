@@ -1,0 +1,14 @@
+{
+  "case_id": "m7-return-refund-07",
+  "items": [
+    {
+      "action_id": "action-m7-return-refund-07",
+      "blockers": [],
+      "kind": "prepare_communication",
+      "may_execute": true,
+      "requires_approval": true,
+      "risk_level": "B"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_actions.v1"
+}

@@ -4,6 +4,7 @@ import hashlib
 import json
 import sqlite3
 import stat
+import sys
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -71,6 +72,93 @@ from lifecase.storage.backup import (
 from lifecase.timeline import TimelineService
 
 _CONFIRMATION = "RESTORE INTO NEW DIRECTORY"
+
+
+def _windows_test_path(path: Path) -> Path:
+    # Test IO must reach the actual long file even on a host with LongPathsEnabled=0.
+    return Path("\\\\?\\" + str(path)) if sys.platform == "win32" else path
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Real Windows long-path regression")
+@pytest.mark.parametrize("root_length", [126, 190])
+def test_windows_long_path_backup_roundtrip_preserves_original_and_validation(
+    tmp_path: Path, tmp_path_factory: pytest.TempPathFactory, root_length: int
+) -> None:
+    config = _config(tmp_path)
+    connection, case_id, pack_id = _full_warranty_case(config)
+    base = tmp_path_factory.getbasetemp() / f"long-backup-{root_length}"
+    padding = root_length - len(str(base)) - 1
+    assert padding > 0, "Use a basetemp short enough to construct the 261-character boundary"
+    backup_root = base / ("x" * padding)
+    recovery_root = backup_root.parent / ("r" * padding)
+    service = BackupService(
+        connection,
+        config.database_path,
+        config.data_root,
+        backup_root=backup_root,
+        recovery_root=recovery_root,
+    )
+    try:
+        artifact = service.create()
+        retained_input = backup_root / artifact.id[:2] / f"{artifact.id}.zip"
+        retained = _windows_test_path(retained_input)
+        original = retained.read_bytes()
+        with zipfile.ZipFile(retained) as archive:
+            longest = max(archive.namelist(), key=len)
+        # At 126, creation used to succeed at 252 chars and download fail at 261.
+        # At 190, even the published ZIP and restored data exceed MAX_PATH.
+        read_member = backup_root / ".lifecase-download-verify-12345678" / longest
+        assert len(str(read_member)) >= 261
+        assert service.get_latest().id == artifact.id
+        download = service.get_download(artifact.id)
+        assert download.path.read_bytes() == original
+        assert verify_backup(retained_input).backup_sha256 == artifact.id
+        validation = service.validate(retained_input)
+        result = service.apply(validation.validation_id, "restored-copy", _CONFIRMATION)
+        target = _windows_test_path(recovery_root / "restored" / result.runtime_id)
+        restarted = connect_database(target / "lifecase.sqlite3")
+        try:
+            assert CaseService(restarted).get_case(case_id).id == case_id
+            assert (
+                EvidencePackService(restarted, target / "data").get_download(pack_id).path.is_file()
+            )
+        finally:
+            restarted.close()
+        with pytest.raises(RestoreTargetNotCleanError):
+            service.apply(validation.validation_id, "restored-copy", _CONFIRMATION)
+
+        corrupted = tmp_path / "corrupted.zip"
+        contents = bytearray(original)
+        contents[len(contents) // 2] ^= 1
+        corrupted.write_bytes(contents)
+        with pytest.raises(BackupIntegrityError):
+            service.validate(corrupted)
+        assert retained.read_bytes() == original
+        assert service.get_latest().id == artifact.id
+        assert not list(_windows_test_path(backup_root).glob(".lifecase-*"))
+        assert not list(_windows_test_path(recovery_root).glob(".lifecase-*"))
+    finally:
+        connection.close()
+
+
+def test_snapshot_uri_handles_special_characters_and_remains_read_only(tmp_path: Path) -> None:
+    path = _windows_test_path(tmp_path / "synthetic #100%.sqlite3")
+    database = sqlite3.connect(path)
+    database.execute("CREATE TABLE synthetic (value)")
+    database.execute("INSERT INTO synthetic VALUES (42)")
+    database.commit()
+    database.close()
+    snapshot = backup_module._open_snapshot(path)
+    try:
+        assert snapshot.execute("SELECT value FROM synthetic").fetchone()[0] == 42
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            snapshot.execute("INSERT INTO synthetic VALUES (7)")
+    finally:
+        snapshot.close()
+    missing = path.with_name("missing #100%.sqlite3")
+    with pytest.raises(sqlite3.OperationalError):
+        backup_module._open_snapshot(missing)
+    assert not missing.exists()
 
 
 def test_full_backup_validates_without_target_and_restores_all_authority(tmp_path: Path) -> None:

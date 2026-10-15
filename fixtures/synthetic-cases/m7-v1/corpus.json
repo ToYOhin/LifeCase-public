@@ -1,0 +1,43 @@
+{
+  "cases": [
+    "m7-return-refund-01",
+    "m7-return-refund-02",
+    "m7-return-refund-03",
+    "m7-return-refund-04",
+    "m7-return-refund-05",
+    "m7-return-refund-06",
+    "m7-return-refund-07",
+    "m7-return-refund-08",
+    "m7-warranty-01",
+    "m7-warranty-02",
+    "m7-warranty-03",
+    "m7-warranty-04",
+    "m7-warranty-05",
+    "m7-warranty-06",
+    "m7-warranty-07",
+    "m7-warranty-08",
+    "m7-reimbursement-01",
+    "m7-reimbursement-02",
+    "m7-reimbursement-03",
+    "m7-reimbursement-04",
+    "m7-reimbursement-05",
+    "m7-reimbursement-06",
+    "m7-reimbursement-07",
+    "m7-subscription-cancellation-01",
+    "m7-subscription-cancellation-02",
+    "m7-subscription-cancellation-03",
+    "m7-subscription-cancellation-04",
+    "m7-travel-logistics-01",
+    "m7-travel-logistics-02",
+    "m7-travel-logistics-03"
+  ],
+  "corpus_version": "m7-v1",
+  "distribution": {
+    "reimbursement": 7,
+    "return_refund": 8,
+    "subscription_cancellation": 4,
+    "travel_logistics": 3,
+    "warranty": 8
+  },
+  "schema_version": "lifecase.m7.corpus.v1"
+}

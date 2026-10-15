@@ -160,6 +160,7 @@ class ActionResponse(BaseModel):
     version: int
     created_at: str
     updated_at: str
+    analysis_basis_status: str | None = None
 
 
 @router.get("/cases/{case_id}/actions", response_model=list[ActionResponse])
@@ -340,6 +341,7 @@ def action_response(record: ActionRecord, position: int) -> ActionResponse:
         risk_level=record.risk_level,
         payload=record.payload.to_dict(),
         payload_sha256=record.payload.sha256,
+        analysis_basis_status=record.analysis_basis_status,
         blockers=[
             ActionBlockerResponse(
                 code=item.code.value,

@@ -67,6 +67,7 @@ export interface ActionRecord {
   deadline: ActionDeadline | null;
   completion_evidence: ActionCompletionEvidence[];
   communication_draft: string | null;
+  analysis_basis_status?: "current" | "changed" | "unavailable" | null;
   topological_position: number;
   version: number;
   created_at: string;
@@ -83,7 +84,12 @@ export interface ActionCreateInput {
   kind: ActionKind;
   risk_level: ActionRiskLevel;
   payload: Record<string, string>;
-  requirements: [];
+  requirements: Array<{
+    claim_id: string;
+    expected_claim_version: number;
+    value_sha256: string;
+    field: string;
+  }>;
   dependencies: [];
   deadline: null;
   actor: string;

@@ -1,0 +1,150 @@
+{
+  "actions": [
+    {
+      "action_id": "action-m7-travel-logistics-01",
+      "blockers": [],
+      "kind": "follow_up",
+      "may_execute": false,
+      "requires_approval": true,
+      "risk_level": "C",
+      "rubric": {
+        "addresses_goal": 2,
+        "communication_is_concise_and_truthful": 2,
+        "identifies_blockers": 2,
+        "orders_prerequisites": 2,
+        "respects_risk_and_approval": 2,
+        "uses_confirmed_facts": 2
+      },
+      "safety_boundary_failure": false
+    }
+  ],
+  "case_id": "m7-travel-logistics-01",
+  "critical_fields": [
+    {
+      "citations": [
+        {
+          "case_id": "m7-travel-logistics-01",
+          "input_path": "input/evidence.txt",
+          "quote_end": 98,
+          "quote_sha256": "1c1ca17a9a448ee757f046c5411984bad0552090bfc72b8f4eccc582a65ee466",
+          "quote_start": 66,
+          "relation": "supports",
+          "segment_id": "segment-m7-travel-logistics-01-000",
+          "segment_sha256": "4f07c54207c058df542d7710cb3ea5b7742bb8fd0a86850126fc82fbd800eb98",
+          "source_id": "source-m7-travel-logistics-01"
+        }
+      ],
+      "claim_id": "claim-m7-travel-logistics-01-merchant",
+      "field": "merchant",
+      "status": "fact",
+      "value": "Synthetic Travel Organization 01"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-travel-logistics-01",
+          "input_path": "input/evidence.txt",
+          "quote_end": 118,
+          "quote_sha256": "55f8e398fe396a925ad8e5846af691dad133341977507c53476a2fee39040e79",
+          "quote_start": 108,
+          "relation": "supports",
+          "segment_id": "segment-m7-travel-logistics-01-000",
+          "segment_sha256": "4f07c54207c058df542d7710cb3ea5b7742bb8fd0a86850126fc82fbd800eb98",
+          "source_id": "source-m7-travel-logistics-01"
+        }
+      ],
+      "claim_id": "claim-m7-travel-logistics-01-amount",
+      "field": "amount",
+      "status": "fact",
+      "value": {
+        "amount_minor": 13836,
+        "currency": "USD"
+      }
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-travel-logistics-01",
+          "input_path": "input/evidence.txt",
+          "quote_end": 157,
+          "quote_sha256": "d4799943bd378cc2a104b8cd3cc16fb117d062de464008e2786658476f87d4c8",
+          "quote_start": 132,
+          "relation": "supports",
+          "segment_id": "segment-m7-travel-logistics-01-000",
+          "segment_sha256": "4f07c54207c058df542d7710cb3ea5b7742bb8fd0a86850126fc82fbd800eb98",
+          "source_id": "source-m7-travel-logistics-01"
+        }
+      ],
+      "claim_id": "claim-m7-travel-logistics-01-purchase-or-event-date",
+      "field": "purchase_or_event_date",
+      "status": "fact",
+      "value": "2026-04-01T09:30:00+08:00"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-travel-logistics-01",
+          "input_path": "input/evidence.txt",
+          "quote_end": 193,
+          "quote_sha256": "a25fb8e999c0f80d8953dbc216d1890aeeaf06eda77d57767324ae45b11e1e6f",
+          "quote_start": 170,
+          "relation": "supports",
+          "segment_id": "segment-m7-travel-logistics-01-000",
+          "segment_sha256": "4f07c54207c058df542d7710cb3ea5b7742bb8fd0a86850126fc82fbd800eb98",
+          "source_id": "source-m7-travel-logistics-01"
+        }
+      ],
+      "claim_id": "claim-m7-travel-logistics-01-order-or-reference",
+      "field": "order_or_reference",
+      "status": "fact",
+      "value": "SYN-TRAVEL-LOGISTICS-01"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-travel-logistics-01",
+          "input_path": "input/evidence.txt",
+          "quote_end": 245,
+          "quote_sha256": "627c51148cd3aaa67bf690ff672ec04b3e453ebfa72bfadc2625940a7ca120d3",
+          "quote_start": 212,
+          "relation": "supports",
+          "segment_id": "segment-m7-travel-logistics-01-000",
+          "segment_sha256": "4f07c54207c058df542d7710cb3ea5b7742bb8fd0a86850126fc82fbd800eb98",
+          "source_id": "source-m7-travel-logistics-01"
+        }
+      ],
+      "claim_id": "claim-m7-travel-logistics-01-desired-outcome",
+      "field": "desired_outcome",
+      "status": "fact",
+      "value": "Synthetic compensation outcome 01"
+    }
+  ],
+  "deadlines": [
+    {
+      "basis_claim_ids": [
+        "claim-m7-travel-logistics-01-purchase-or-event-date"
+      ],
+      "date_kind": "utc_instant",
+      "deadline_id": "deadline-m7-travel-logistics-01",
+      "due_value": "2026-04-01T01:30:00.000000Z",
+      "external_obligation": true,
+      "kind": "explicit",
+      "rule": null,
+      "timezone": "Asia/Shanghai"
+    }
+  ],
+  "gaps": {
+    "blockers": [],
+    "case_id": "m7-travel-logistics-01",
+    "missing_claims": [],
+    "missing_evidence": []
+  },
+  "operational": {
+    "cost_minor_units": 0,
+    "model_calls": 0,
+    "repairs": 0,
+    "tokens": 0
+  },
+  "processing_status": "evaluation_only_recorded",
+  "schema_version": "lifecase.m7.observed.v1"
+}

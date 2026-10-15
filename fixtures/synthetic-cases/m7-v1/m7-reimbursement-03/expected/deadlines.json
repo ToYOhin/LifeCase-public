@@ -1,0 +1,18 @@
+{
+  "case_id": "m7-reimbursement-03",
+  "items": [
+    {
+      "basis_claim_ids": [
+        "claim-m7-reimbursement-03-purchase-or-event-date"
+      ],
+      "date_kind": "local_date",
+      "deadline_id": "deadline-m7-reimbursement-03",
+      "due_value": "2026-07-19",
+      "external_obligation": true,
+      "kind": "explicit",
+      "rule": null,
+      "timezone": "Asia/Shanghai"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_deadlines.v1"
+}

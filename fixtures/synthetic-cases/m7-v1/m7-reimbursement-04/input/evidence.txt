@@ -1,0 +1,1 @@
+Synthetic administrative record m7-reimbursement-04. Merchant: Synthetic Reimbursement Org 04. Amount: USD 127.40. Event date: 2026-08-20T09:30:00+08:00. Reference: Reference unavailable. Desired outcome: Synthetic reimbursement outcome 04. This generated material contains no real person, account, address, credential, or payment instrument.

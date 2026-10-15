@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 export type WorkflowArea = "overview" | "agent" | "review" | "actions" | "records";
 
@@ -11,6 +11,7 @@ interface CaseWorkflowProps {
   primaryActionLabel: string;
   onPrimaryAction: () => void;
   onReturn: () => void;
+  recommendation?: ReactNode;
   operations?: ReactNode;
   feedback?: ReactNode;
   activeArea: WorkflowArea;
@@ -25,13 +26,12 @@ interface CaseWorkflowProps {
 const WORKFLOW_AREAS: Array<{
   id: WorkflowArea;
   label: string;
-  hint: string;
 }> = [
-  { id: "overview", label: "案件概览", hint: "材料与案件摘要" },
-  { id: "agent", label: "Agent 分析", hint: "只读证据分析" },
-  { id: "review", label: "事实复核", hint: "核对候选事实" },
-  { id: "actions", label: "行动与截止", hint: "日期、行动与审批" },
-  { id: "records", label: "记录与导出", hint: "进展、证据包与备份" },
+  { id: "overview", label: "案件概览" },
+  { id: "agent", label: "问题分析" },
+  { id: "review", label: "事实复核" },
+  { id: "actions", label: "行动与截止" },
+  { id: "records", label: "记录与导出" },
 ];
 
 export function CaseWorkflow({
@@ -43,6 +43,7 @@ export function CaseWorkflow({
   primaryActionLabel,
   onPrimaryAction,
   onReturn,
+  recommendation,
   operations,
   feedback,
   activeArea,
@@ -53,6 +54,11 @@ export function CaseWorkflow({
   actions,
   records,
 }: CaseWorkflowProps) {
+  const [actionsVisited, setActionsVisited] = useState(activeArea === "actions");
+  useEffect(() => {
+    if (activeArea === "actions") setActionsVisited(true);
+  }, [activeArea]);
+
   const panels: Record<WorkflowArea, ReactNode> = {
     overview,
     agent,
@@ -71,7 +77,7 @@ export function CaseWorkflow({
             <h2 id="case-workflow-title">{caseTitle}</h2>
           </div>
         </div>
-        <div className="case-control-next">
+        {recommendation ?? <><div className="case-control-next">
           <small>推荐步骤</small>
           <strong>{nextStepTitle}</strong>
           <span>{nextStepDetail}</span>
@@ -83,11 +89,11 @@ export function CaseWorkflow({
           <button type="button" onClick={onPrimaryAction}>
             {primaryActionLabel}
           </button>
-        </div>
+        </div></>}
         {operations}
       </div>
       <div className="workflow-area-tabs" role="tablist" aria-label="案件工作区域">
-        {WORKFLOW_AREAS.map((area, index) => (
+        {WORKFLOW_AREAS.map((area) => (
           <button
             type="button"
             role="tab"
@@ -98,9 +104,7 @@ export function CaseWorkflow({
             key={area.id}
             onClick={() => onSelect(area.id)}
           >
-            <span>{String(index + 1).padStart(2, "0")}</span>
             <strong>{area.label}</strong>
-            <small>{area.hint}</small>
           </button>
         ))}
       </div>
@@ -113,14 +117,25 @@ export function CaseWorkflow({
         </select>
       </label>
       {feedback}
-      <div
-        className="workflow-area-panel"
-        role="tabpanel"
-        id={`workflow-panel-${activeArea}`}
-        aria-labelledby={`workflow-tab-${activeArea}`}
-      >
-        {panels[activeArea]}
-      </div>
+      {activeArea !== "actions" && <div
+          key="active"
+          className="workflow-area-panel"
+          role="tabpanel"
+          id={`workflow-panel-${activeArea}`}
+          aria-labelledby={`workflow-tab-${activeArea}`}
+        >
+          {panels[activeArea]}
+        </div>}
+      {(actionsVisited || activeArea === "actions") && <div
+          key="actions"
+          className="workflow-area-panel"
+          role="tabpanel"
+          id="workflow-panel-actions"
+          aria-labelledby="workflow-tab-actions"
+          hidden={activeArea !== "actions"}
+        >
+          {actions}
+        </div>}
     </section>
   );
 }

@@ -125,6 +125,7 @@ def _catalog_item(binding: TemplateBinding, template: CaseTemplate) -> TemplateC
         title=template.title,
         goal_options=template.goal_options,
         required_claims=template.required_claims,
+        conditional_claims=template.conditional_claims,
         evidence_requirements=template.evidence_requirements,
         content_sha256=template.content_sha256,
     )

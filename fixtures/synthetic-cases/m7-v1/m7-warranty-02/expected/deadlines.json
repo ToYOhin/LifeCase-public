@@ -1,0 +1,18 @@
+{
+  "case_id": "m7-warranty-02",
+  "items": [
+    {
+      "basis_claim_ids": [
+        "claim-m7-warranty-02-purchase-or-event-date"
+      ],
+      "date_kind": "utc_instant",
+      "deadline_id": "deadline-m7-warranty-02",
+      "due_value": "2026-10-10T01:30:00.000000Z",
+      "external_obligation": true,
+      "kind": "explicit",
+      "rule": null,
+      "timezone": "Asia/Shanghai"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_deadlines.v1"
+}

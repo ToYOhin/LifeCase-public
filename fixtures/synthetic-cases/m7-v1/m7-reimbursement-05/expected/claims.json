@@ -1,0 +1,44 @@
+{
+  "case_id": "m7-reimbursement-05",
+  "critical_fields": [
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-reimbursement-05-merchant",
+      "expected_value": "Synthetic Reimbursement Organization 05",
+      "field": "merchant"
+    },
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-reimbursement-05-amount",
+      "expected_value": {
+        "amount_minor": 12877,
+        "currency": "CNY"
+      },
+      "field": "amount"
+    },
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-reimbursement-05-purchase-or-event-date",
+      "expected_value": "2026-09-21",
+      "field": "purchase_or_event_date"
+    },
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-reimbursement-05-order-or-reference",
+      "expected_value": "SYN-REIMBURSEMENT-05",
+      "field": "order_or_reference"
+    },
+    {
+      "acceptable_values": [],
+      "allow_unknown": false,
+      "claim_id": "claim-m7-reimbursement-05-desired-outcome",
+      "expected_value": "Synthetic reimbursement outcome 05",
+      "field": "desired_outcome"
+    }
+  ],
+  "schema_version": "lifecase.m7.expected_claims.v1"
+}

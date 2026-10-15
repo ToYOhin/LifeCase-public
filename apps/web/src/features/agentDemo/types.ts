@@ -1,3 +1,5 @@
+import type { ReviewCitation } from "../review/types";
+
 export type AgentStageName =
   | "extract"
   | "normalize"
@@ -75,6 +77,31 @@ export interface AgentAnswer {
   statements: string[];
   citations: AgentCitation[];
   uncertainty_reason: string | null;
+  fact_references?: AnalysisFact[];
+}
+
+export interface AnalysisFact {
+  claim_id: string;
+  field: string;
+  value: unknown;
+  value_sha256: string;
+  version: number;
+  status: string;
+  confirmation_basis: "evidence" | "user" | "correction" | null;
+  confirmation: { actor: string; reason: string; occurred_at: string } | null;
+  evidence_status: "valid" | "unavailable" | "none";
+  conflict: boolean;
+  usable_as_fact: boolean;
+  citations: Omit<ReviewCitation, "text">[];
+}
+
+export type AnalysisBasisStatus = "current" | "changed" | "unavailable";
+
+export interface RunAnalysis {
+  question: string;
+  basis_sha256: string;
+  basis_status: AnalysisBasisStatus;
+  facts: AnalysisFact[];
 }
 
 export interface AgentToolCall {
@@ -87,6 +114,7 @@ export interface AgentToolCall {
 export interface AgentRun {
   id: string;
   case_id: string;
+  stage_order: AgentStageName[];
   status: "queued" | "running" | "checkpointed" | "needs_review" | "cancelled" | "completed";
   version: number;
   current_stage: AgentStageName | null;
@@ -106,6 +134,7 @@ export interface AgentRun {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  analysis?: RunAnalysis | null;
 }
 
 export interface AgentDemoResult {
@@ -123,6 +152,7 @@ export interface LiveAgentCapability {
 }
 
 export interface LiveAgentPreview {
+  question?: string | null;
   case_type: "warranty";
   evidence: {
     segment_count: number;
@@ -134,16 +164,20 @@ export interface LiveAgentPreview {
 }
 
 export interface LiveAgentResult {
-  live_version: "live_agent_read_only.v1";
+  live_version: "live_agent_read_only.v2" | "live_agent_read_only.v3";
   capability: LiveAgentCapability;
-  preview: LiveAgentPreview;
+  preview: LiveAgentPreview | null;
   run: AgentRun | null;
   run_history: LiveAgentRunHistory[];
 }
 
 export interface LiveAgentRunHistory {
+  question?: string | null;
+  basis_status?: AnalysisBasisStatus | "legacy";
+  answer?: AgentAnswer | null;
   version: number;
   id: string;
+  stage_order: AgentStageName[];
   status: AgentRun["status"];
   provider: string | null;
   model_id: string | null;

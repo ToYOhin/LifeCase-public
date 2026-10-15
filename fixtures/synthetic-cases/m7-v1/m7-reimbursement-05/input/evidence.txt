@@ -1,0 +1,1 @@
+Synthetic administrative record m7-reimbursement-05. Merchant: Synthetic Reimbursement Organization 05. Amount: CNY 128.77. Event date: 2026-09-21. Reference: SYN-REIMBURSEMENT-05. Desired outcome: Synthetic reimbursement outcome 05. This generated material contains no real person, account, address, credential, or payment instrument.

@@ -425,6 +425,14 @@ textarea:focus-visible,
   white-space: nowrap;
 }
 
+.case-control-next.warranty-next-step span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
 .case-control-actions {
   justify-content: flex-end;
 }
@@ -450,8 +458,8 @@ textarea:focus-visible,
 .workflow-area-tabs button {
   display: grid;
   min-width: 0;
-  min-height: 82px;
-  grid-template-columns: auto 1fr;
+  min-height: 56px;
+  grid-template-columns: 1fr;
   align-content: center;
   gap: 3px 9px;
   padding: 13px 14px;
@@ -696,7 +704,7 @@ textarea:focus-visible,
 
 .docket-summary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid #42634f;
 }
 
@@ -1300,6 +1308,7 @@ textarea:focus-visible,
 }
 
 .decision-meta input,
+.correction-editor input,
 .correction-editor textarea {
   width: 100%;
   padding: 11px 12px;
@@ -1768,9 +1777,7 @@ button:disabled {
 }
 
 .hash-rail code {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .source-meta {
@@ -2058,6 +2065,12 @@ button:disabled {
   font: 0.62rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.timeline-reference > summary {
+  color: #514b42;
+  cursor: pointer;
+  font: 600 0.8rem/1.5 "Microsoft YaHei", sans-serif;
+}
+
 .timeline-state {
   display: grid;
   box-sizing: border-box;
@@ -2272,6 +2285,10 @@ button:disabled {
   box-shadow: 0 22px 55px rgb(31 53 41 / 14%);
 }
 
+.action-board > .lazy-workflow-tool > summary {
+  color: #263f36;
+}
+
 .action-head {
   display: flex;
   align-items: center;
@@ -2333,6 +2350,40 @@ button:disabled {
   list-style: none;
 }
 
+.action-reading-summary {
+  margin: 0;
+  padding: 16px 24px 0;
+  color: #d5e2d9;
+  line-height: 1.7;
+}
+
+.action-reading-heading {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid #6e8376;
+}
+
+.action-reading-heading h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.action-reading-heading h3 span {
+  color: #e6bd69;
+  font-size: 0.8rem;
+}
+
+.action-reading-heading p {
+  margin: 7px 0 0;
+  color: #c5d5ca;
+  line-height: 1.6;
+}
+
 .action-card {
   min-width: 0;
   padding: 20px;
@@ -2340,6 +2391,28 @@ button:disabled {
   border-left-width: 5px;
   color: #263d31;
   background: #fbf8ef;
+  align-self: start;
+}
+
+.action-authority-details,
+.action-version-details,
+.material-details {
+  margin: 12px 0;
+  min-width: 0;
+}
+
+.action-draft-copy p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
+.action-authority-details > summary,
+.action-version-details > summary,
+.material-details > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .action-collect_evidence { border-left-color: #4d8469; }

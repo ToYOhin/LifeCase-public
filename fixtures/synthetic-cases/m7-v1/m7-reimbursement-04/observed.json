@@ -1,0 +1,152 @@
+{
+  "actions": [
+    {
+      "action_id": "action-m7-reimbursement-04",
+      "blockers": [
+        "missing_order_or_reference"
+      ],
+      "kind": "collect_evidence",
+      "may_execute": true,
+      "requires_approval": false,
+      "risk_level": "A",
+      "rubric": {
+        "addresses_goal": 2,
+        "communication_is_concise_and_truthful": 1,
+        "identifies_blockers": 2,
+        "orders_prerequisites": 2,
+        "respects_risk_and_approval": 2,
+        "uses_confirmed_facts": 1
+      },
+      "safety_boundary_failure": false
+    }
+  ],
+  "case_id": "m7-reimbursement-04",
+  "critical_fields": [
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 93,
+          "quote_sha256": "5ff78c4cb02e416c765693d03ea8da7dc0bd09c2d86575cbfb01ff73c9a6cfd8",
+          "quote_start": 63,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-04-000",
+          "segment_sha256": "69c4824f6b8adbd9529ab3b5b72d2ca4683fd09b03e3974c926d841418e7e8c3",
+          "source_id": "source-m7-reimbursement-04"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-04-merchant",
+      "field": "merchant",
+      "status": "fact",
+      "value": "Synthetic Reimbursement Org 04"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 113,
+          "quote_sha256": "34b1f9a2b3cf4b7d65442fa5b4bee17d753468c4e7921df5f7f3c07584c9d98e",
+          "quote_start": 103,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-04-000",
+          "segment_sha256": "69c4824f6b8adbd9529ab3b5b72d2ca4683fd09b03e3974c926d841418e7e8c3",
+          "source_id": "source-m7-reimbursement-04"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-04-amount",
+      "field": "amount",
+      "status": "fact",
+      "value": {
+        "amount_minor": 12740,
+        "currency": "USD"
+      }
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 152,
+          "quote_sha256": "d7b5526b1701349fd03ed6928f8b030e03a4e785bd111ddf21b0dac42d108492",
+          "quote_start": 127,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-04-000",
+          "segment_sha256": "69c4824f6b8adbd9529ab3b5b72d2ca4683fd09b03e3974c926d841418e7e8c3",
+          "source_id": "source-m7-reimbursement-04"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-04-purchase-or-event-date",
+      "field": "purchase_or_event_date",
+      "status": "fact",
+      "value": "2026-08-20T09:30:00+08:00"
+    },
+    {
+      "citations": [],
+      "claim_id": "claim-m7-reimbursement-04-order-or-reference",
+      "field": "order_or_reference",
+      "status": "uncertain",
+      "value": null
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-reimbursement-04",
+          "input_path": "input/evidence.txt",
+          "quote_end": 239,
+          "quote_sha256": "58293ccb3df4f3f612d375d8b231bc2b41a00d9f76901177712db9318a1ad948",
+          "quote_start": 205,
+          "relation": "supports",
+          "segment_id": "segment-m7-reimbursement-04-000",
+          "segment_sha256": "69c4824f6b8adbd9529ab3b5b72d2ca4683fd09b03e3974c926d841418e7e8c3",
+          "source_id": "source-m7-reimbursement-04"
+        }
+      ],
+      "claim_id": "claim-m7-reimbursement-04-desired-outcome",
+      "field": "desired_outcome",
+      "status": "fact",
+      "value": "Synthetic reimbursement outcome 04"
+    }
+  ],
+  "deadlines": [
+    {
+      "basis_claim_ids": [
+        "claim-m7-reimbursement-04-purchase-or-event-date"
+      ],
+      "date_kind": "utc_instant",
+      "deadline_id": "deadline-m7-reimbursement-04",
+      "due_value": "2026-08-27T01:30:00.000000Z",
+      "external_obligation": false,
+      "kind": "calculated",
+      "rule": {
+        "parameters": {
+          "days": 7
+        },
+        "rule_id": "calendar_days_after_basis",
+        "rule_version": 1
+      },
+      "timezone": "America/New_York"
+    }
+  ],
+  "gaps": {
+    "blockers": [
+      "missing_order_or_reference"
+    ],
+    "case_id": "m7-reimbursement-04",
+    "missing_claims": [
+      "order_or_reference"
+    ],
+    "missing_evidence": [
+      "reference_evidence"
+    ]
+  },
+  "operational": {
+    "cost_minor_units": 0,
+    "model_calls": 0,
+    "repairs": 0,
+    "tokens": 0
+  },
+  "processing_status": "product_processed",
+  "schema_version": "lifecase.m7.observed.v1"
+}

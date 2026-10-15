@@ -31,6 +31,7 @@ class TimelineEventKind(StrEnum):
     ACTION_FAILED = "action_failed"
     ACTION_CANCELLED = "action_cancelled"
     ACTION_APPROVED = "action_approved"
+    ACTION_PROGRESS_RECORDED = "action_progress_recorded"
     APPROVAL_REQUESTED = "approval_requested"
     APPROVAL_APPROVED = "approval_approved"
     APPROVAL_REJECTED = "approval_rejected"
@@ -50,6 +51,7 @@ class TimelineAuthorityType(StrEnum):
     AGENT_STAGE_RUN = "agent_stage_run"
     DEADLINE_EVENT = "deadline_event"
     ACTION_EVENT = "action_event"
+    ACTION_PROGRESS = "action_progress"
     APPROVAL_EVENT = "approval_event"
 
 

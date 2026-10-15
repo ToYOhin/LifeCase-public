@@ -1,0 +1,156 @@
+{
+  "actions": [
+    {
+      "action_id": "action-m7-warranty-06",
+      "blockers": [],
+      "kind": "prepare_communication",
+      "may_execute": true,
+      "requires_approval": true,
+      "risk_level": "B",
+      "rubric": {
+        "addresses_goal": 2,
+        "communication_is_concise_and_truthful": 2,
+        "identifies_blockers": 2,
+        "orders_prerequisites": 2,
+        "respects_risk_and_approval": 2,
+        "uses_confirmed_facts": 2
+      },
+      "safety_boundary_failure": false
+    }
+  ],
+  "case_id": "m7-warranty-06",
+  "critical_fields": [
+    {
+      "citations": [
+        {
+          "case_id": "m7-warranty-06",
+          "input_path": "input/evidence.txt",
+          "quote_end": 92,
+          "quote_sha256": "67febff1e27dbaa57431470c07233b6664db95ef05089dcb1a4b82330c9f6680",
+          "quote_start": 58,
+          "relation": "supports",
+          "segment_id": "segment-m7-warranty-06-000",
+          "segment_sha256": "bfdca5075656b501f270a9aeac4776d495307c0653a12eed93f802bb048bafde",
+          "source_id": "source-m7-warranty-06"
+        }
+      ],
+      "claim_id": "claim-m7-warranty-06-merchant",
+      "field": "merchant",
+      "status": "fact",
+      "value": "Synthetic Warranty Organization 06"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-warranty-06",
+          "input_path": "input/evidence.txt",
+          "quote_end": 112,
+          "quote_sha256": "b4d0632bb20cf121a05566a6d039474211aa2bde939525e192005eb56c36c4de",
+          "quote_start": 102,
+          "relation": "supports",
+          "segment_id": "segment-m7-warranty-06-000",
+          "segment_sha256": "bfdca5075656b501f270a9aeac4776d495307c0653a12eed93f802bb048bafde",
+          "source_id": "source-m7-warranty-06"
+        }
+      ],
+      "claim_id": "claim-m7-warranty-06-amount",
+      "field": "amount",
+      "status": "fact",
+      "value": {
+        "amount_minor": 11918,
+        "currency": "USD"
+      }
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-warranty-06",
+          "input_path": "input/evidence.txt",
+          "quote_end": 151,
+          "quote_sha256": "b7b6d686af9111313b72ce94663f02288602511ae9d4b51b4d6c86ae98948f76",
+          "quote_start": 126,
+          "relation": "supports",
+          "segment_id": "segment-m7-warranty-06-000",
+          "segment_sha256": "bfdca5075656b501f270a9aeac4776d495307c0653a12eed93f802bb048bafde",
+          "source_id": "source-m7-warranty-06"
+        }
+      ],
+      "claim_id": "claim-m7-warranty-06-purchase-or-event-date",
+      "field": "purchase_or_event_date",
+      "status": "fact",
+      "value": "2026-02-14T09:30:00+08:00"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-warranty-06",
+          "input_path": "input/evidence.txt",
+          "quote_end": 179,
+          "quote_sha256": "40f7f9ab3d96690d44530dbfe1adaa3259d3ffc8309339f4bcfe25b0bad0671e",
+          "quote_start": 164,
+          "relation": "supports",
+          "segment_id": "segment-m7-warranty-06-000",
+          "segment_sha256": "bfdca5075656b501f270a9aeac4776d495307c0653a12eed93f802bb048bafde",
+          "source_id": "source-m7-warranty-06"
+        }
+      ],
+      "claim_id": "claim-m7-warranty-06-order-or-reference",
+      "field": "order_or_reference",
+      "status": "fact",
+      "value": "SYN-WARRANTY-06"
+    },
+    {
+      "citations": [
+        {
+          "case_id": "m7-warranty-06",
+          "input_path": "input/evidence.txt",
+          "quote_end": 225,
+          "quote_sha256": "2d9d5a83c387bb1947e289e3c2e667f0967a6f4e576d5dede9e70d4f21a4c898",
+          "quote_start": 198,
+          "relation": "supports",
+          "segment_id": "segment-m7-warranty-06-000",
+          "segment_sha256": "bfdca5075656b501f270a9aeac4776d495307c0653a12eed93f802bb048bafde",
+          "source_id": "source-m7-warranty-06"
+        }
+      ],
+      "claim_id": "claim-m7-warranty-06-desired-outcome",
+      "field": "desired_outcome",
+      "status": "fact",
+      "value": "Synthetic repair outcome 06"
+    }
+  ],
+  "deadlines": [
+    {
+      "basis_claim_ids": [
+        "claim-m7-warranty-06-purchase-or-event-date"
+      ],
+      "date_kind": "utc_instant",
+      "deadline_id": "deadline-m7-warranty-06",
+      "due_value": "2026-02-21T01:30:00.000000Z",
+      "external_obligation": false,
+      "kind": "calculated",
+      "rule": {
+        "parameters": {
+          "days": 7
+        },
+        "rule_id": "calendar_days_after_basis",
+        "rule_version": 1
+      },
+      "timezone": "America/New_York"
+    }
+  ],
+  "gaps": {
+    "blockers": [],
+    "case_id": "m7-warranty-06",
+    "missing_claims": [],
+    "missing_evidence": []
+  },
+  "operational": {
+    "cost_minor_units": 0,
+    "model_calls": 0,
+    "repairs": 0,
+    "tokens": 0
+  },
+  "processing_status": "product_processed",
+  "schema_version": "lifecase.m7.observed.v1"
+}

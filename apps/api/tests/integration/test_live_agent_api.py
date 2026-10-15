@@ -337,7 +337,20 @@ def test_live_agent_openapi_accepts_only_server_bounded_confirmation(tmp_path: P
     authorization = schema["components"]["schemas"]["LiveAgentAuthorizationRequest"]
     assert authorization["additionalProperties"] is False
     assert authorization["required"] == ["preview_sha256", "confirm_read_only"]
-    assert set(authorization["properties"]) == {"preview_sha256", "confirm_read_only"}
+    assert set(authorization["properties"]) == {
+        "preview_sha256",
+        "confirm_read_only",
+        "question",
+    }
+    question = schema["components"]["schemas"]["LiveAgentQuestionRequest"]
+    assert question["additionalProperties"] is False
+    assert question["required"] == ["question"]
+    assert set(question["properties"]) == {"question"}
+    assert question["properties"]["question"]["maxLength"] == 2000
+    command_request = schema["components"]["schemas"]["LiveAgentCommandRequest"]
+    assert command_request["additionalProperties"] is False
+    assert command_request["required"] == ["expected_run_id"]
+    assert set(command_request["properties"]) == {"expected_run_id"}
     capability = schema["components"]["schemas"]["LiveAgentCapabilityResponse"]
     assert capability["properties"]["provider"]["enum"] == [
         "disabled",
@@ -350,7 +363,10 @@ def test_live_agent_openapi_accepts_only_server_bounded_confirmation(tmp_path: P
     ]
     for command in ("execute", "retry", "recover", "cancel"):
         operation = schema["paths"][f"/api/v1/cases/{{case_id}}/live-agent/{command}"]["post"]
-        assert "requestBody" not in operation
+        assert operation["requestBody"].get("required", False) is False
+        assert {"$ref": "#/components/schemas/LiveAgentCommandRequest"} in (
+            operation["requestBody"]["content"]["application/json"]["schema"]["anyOf"]
+        )
 
 
 def test_live_agent_default_disabled_never_calls_injected_client(tmp_path: Path) -> None:
@@ -597,17 +613,12 @@ def test_live_agent_in_memory_client_completes_read_only_product_run(tmp_path: P
     assert run["status"] == "completed"
     assert [stage["name"] for stage in run["stages"]] == [
         "extract",
-        "normalize",
-        "link_claims",
-        "classify_case",
-        "check_gaps",
-        "propose_actions",
         "validate",
     ]
     assert all(stage["provider"] == "openai" for stage in run["stages"])
     assert {claim["status"] for claim in run["claims"]} <= {"candidate", "inferred"}
     assert run["answer"]["status"] in {"answered", "unknown"}
-    assert len(boundary.resource.calls) == 7
+    assert len(boundary.resource.calls) == 2
     assert all(call["store"] is False for call in boundary.resource.calls)
     assert all("tools" not in call for call in boundary.resource.calls)
     assert case_after.status_code == 200
@@ -712,7 +723,7 @@ def test_live_agent_in_memory_groq_client_completes_read_only_product_run(
     assert all(stage["provider"] == "groq" for stage in run["stages"])
     assert {claim["status"] for claim in run["claims"]} <= {"candidate", "inferred"}
     assert run["answer"]["status"] in {"answered", "unknown"}
-    assert len(boundary.chat.completions.calls) == 7
+    assert len(boundary.chat.completions.calls) == 2
     assert all(call["stream"] is False for call in boundary.chat.completions.calls)
     assert all(call["tool_choice"] == "none" for call in boundary.chat.completions.calls)
     assert all("tools" not in call for call in boundary.chat.completions.calls)
@@ -782,7 +793,7 @@ def test_live_agent_in_memory_mistral_client_completes_read_only_product_run(
     assert all(stage["provider"] == "mistral" for stage in run["stages"])
     assert {claim["status"] for claim in run["claims"]} <= {"candidate", "inferred"}
     assert run["answer"]["status"] in {"answered", "unknown"}
-    assert len(boundary.chat.completions.calls) == 7
+    assert len(boundary.chat.completions.calls) == 2
     assert all(call["stream"] is False for call in boundary.chat.completions.calls)
     assert all(call["tool_choice"] == "none" for call in boundary.chat.completions.calls)
     assert all("tools" not in call for call in boundary.chat.completions.calls)
@@ -861,7 +872,7 @@ def test_live_agent_in_memory_deepseek_client_completes_read_only_product_run(
     assert all(stage["model_id"] == DEEPSEEK_CHAT_MODEL_ID for stage in run["stages"])
     assert {claim["status"] for claim in run["claims"]} <= {"candidate", "inferred"}
     assert run["answer"]["status"] in {"answered", "unknown"}
-    assert len(boundary.calls) == 7
+    assert len(boundary.calls) == 2
     assert all(call["stream"] is False for call in boundary.calls)
     assert all(call["tool_choice"] == "none" for call in boundary.calls)
     assert all(call["thinking"] == {"type": "disabled"} for call in boundary.calls)
@@ -894,6 +905,55 @@ def test_live_agent_long_goal_retrieves_terms_instead_of_one_exact_phrase(
             client,
             case["id"],
             "海岚滚筒洗衣机购买后无法启动，现申请保修并安排送修。",
+        )
+        preview = client.get(f"/api/v1/cases/{case['id']}/live-agent").json()
+        client.post(
+            f"/api/v1/cases/{case['id']}/live-agent",
+            json={
+                "preview_sha256": preview["preview"]["preview_sha256"],
+                "confirm_read_only": True,
+            },
+        )
+        completed = client.post(f"/api/v1/cases/{case['id']}/live-agent/execute")
+
+    assert completed.status_code == 200, completed.text
+    run = completed.json()["run"]
+    assert run["answer"]["status"] == "answered"
+    assert run["answer"]["citations"]
+    assert run["model_id"] == DEEPSEEK_CHAT_PRO_MODEL_ID
+
+
+def test_live_agent_english_appliance_goal_retrieves_model_fault_and_warranty(
+    tmp_path: Path,
+) -> None:
+    boundary = _InMemoryDeepSeekClient(model_id=DEEPSEEK_CHAT_PRO_MODEL_ID)
+    config = _deepseek_config(
+        tmp_path,
+        confirmed=True,
+        model_id=DEEPSEEK_CHAT_PRO_MODEL_ID,
+    )
+    with TestClient(create_app(config, deepseek_client=boundary)) as client:
+        case = _create_case(
+            client,
+            template_id="warranty",
+            goal=(
+                "Verify HAIXING-H8 E21 warranty coverage and prepare facts for on-site inspection."
+            ),
+        )
+        _upload_evidence(
+            client,
+            case["id"],
+            "HAIXING-H8 front-loading washing machine has a 36-month warranty.",
+        )
+        _upload_evidence(
+            client,
+            case["id"],
+            "Purchase record for HAIXING-H8 dated 2026-07-15.",
+        )
+        _upload_evidence(
+            client,
+            case["id"],
+            "HAIXING-H8 stopped during drainage with fault code E21; request repair service.",
         )
         preview = client.get(f"/api/v1/cases/{case['id']}/live-agent").json()
         client.post(

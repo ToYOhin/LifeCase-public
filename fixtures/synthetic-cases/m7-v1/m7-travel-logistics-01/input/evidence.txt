@@ -1,0 +1,1 @@
+Synthetic administrative record m7-travel-logistics-01. Merchant: Synthetic Travel Organization 01. Amount: USD 138.36. Event date: 2026-04-01T09:30:00+08:00. Reference: SYN-TRAVEL-LOGISTICS-01. Desired outcome: Synthetic compensation outcome 01. This generated material contains no real person, account, address, credential, or payment instrument.

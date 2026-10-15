@@ -30,6 +30,7 @@ EXPECTED_TABLES = {
     "action_deadline",
     "action_dependency",
     "action_event",
+    "action_progress",
     "action_requirement_claim",
     "agent_run",
     "agent_stage_run",
@@ -50,9 +51,22 @@ EXPECTED_TABLES = {
     "source_extraction",
     "source_segment",
     "source_segment_fts",
+    "warranty_preparation_intent",
 }
 
 EXPECTED_COLUMNS = {
+    "action_progress": [
+        "id",
+        "action_id",
+        "case_id",
+        "position",
+        "action_version",
+        "kind",
+        "text",
+        "actor",
+        "reason",
+        "created_at",
+    ],
     "approval_event": [
         "id",
         "approval_id",
@@ -169,6 +183,8 @@ EXPECTED_COLUMNS = {
         "created_at",
         "updated_at",
         "completed_at",
+        "input_binding_json",
+        "input_binding_sha256",
     ],
     "agent_stage_run": [
         "id",
@@ -335,6 +351,7 @@ EXPECTED_COLUMNS = {
         "updated_at",
     ],
     "source_segment_fts": ["source_id", "segment_id", "text", "text_sha256"],
+    "warranty_preparation_intent": ["case_id", "intent", "version", "updated_at"],
 }
 
 
@@ -424,7 +441,7 @@ def test_agent_run_versioning_migration_preserves_history_and_allows_new_run(
     connection = connect_database(tmp_path / "lifecase.sqlite3")
     timestamp = "2026-08-13T00:00:00.000000Z"
     try:
-        apply_migrations(connection, MIGRATIONS[:-1])
+        apply_migrations(connection, MIGRATIONS[:15])
         connection.execute(
             """
             INSERT INTO case_record (

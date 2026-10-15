@@ -24,7 +24,8 @@ describe("workflow panel density", () => {
 
   it("keeps Action registration closed until requested", () => {
     const markup = renderToStaticMarkup(
-      <ActionPanel caseId="case_synthetic" caseTitle={null} refreshKey={0} onChanged={async () => undefined} sources={[]} evidenceFields={[]} />,
+      <ActionPanel caseId="case_synthetic" caseTitle={null} caseType="warranty" requiredClaimFields={null}
+        refreshKey={0} onChanged={async () => undefined} sources={[]} evidenceFields={[]} />,
     );
     expect(markup).toContain("登记本地行动");
     expect(markup).not.toContain("模板没有可选材料项");

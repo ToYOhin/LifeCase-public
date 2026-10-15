@@ -15,11 +15,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import quote
 
 from lifecase import __version__
 from lifecase.actions import ActionService
+from lifecase.agent.errors import AgentValidationError
+from lifecase.agent.question_binding import validate_run_binding
 from lifecase.approvals import ApprovalService
 from lifecase.cases import CaseService
+from lifecase.cases.preparation import PreparationIntentError, PreparationIntentService
 from lifecase.claims import ClaimService
 from lifecase.deadlines import DeadlineService
 from lifecase.evidence.pack import EvidencePackService
@@ -114,8 +118,12 @@ class BackupService:
         self._database_path = database_path.expanduser().resolve()
         self._data_root = data_root.expanduser().resolve()
         runtime_parent = self._database_path.parent
-        self._backup_root = (backup_root or runtime_parent / "backups").expanduser().resolve()
-        self._recovery_root = (recovery_root or runtime_parent / "recovery").expanduser().resolve()
+        self._backup_root = _backup_io_path(
+            (backup_root or runtime_parent / "backups").expanduser().resolve()
+        )
+        self._recovery_root = _backup_io_path(
+            (recovery_root or runtime_parent / "recovery").expanduser().resolve()
+        )
         self._policy = policy
 
     def create(self) -> BackupArtifact:
@@ -211,6 +219,7 @@ class BackupService:
         """Validate an archive without writing any restore target."""
 
         try:
+            archive_path = _backup_io_path(archive_path)
             recovery_root = _safe_root(self._recovery_root)
             with tempfile.TemporaryDirectory(
                 prefix=".lifecase-restore-validation-", dir=recovery_root
@@ -307,7 +316,8 @@ def verify_backup(path: Path, policy: BackupPolicy = _DEFAULT_POLICY) -> Restore
     """Independently verify a portable backup without retaining it."""
 
     try:
-        parent = path.expanduser().resolve(strict=True).parent
+        path = _backup_io_path(path.expanduser()).resolve(strict=True)
+        parent = path.parent
         with tempfile.TemporaryDirectory(prefix=".lifecase-backup-verify-", dir=parent) as name:
             return _validate_archive(path, Path(name), policy).validation
     except BackupRestoreError:
@@ -431,7 +441,7 @@ def _write_archive(
 
 def _validate_archive(path: Path, extraction_root: Path, policy: BackupPolicy) -> _ValidatedArchive:
     try:
-        return _validate_archive_content(path, extraction_root, policy)
+        return _validate_archive_content(_backup_io_path(path), extraction_root, policy)
     except BackupRestoreError:
         raise
     except (
@@ -603,6 +613,25 @@ def _verify_database(connection: sqlite3.Connection) -> None:
     if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
         raise BackupIntegrityError("Backup database foreign keys are invalid")
     _migration_catalog(connection)
+    _verify_question_bindings(connection)
+
+
+def _verify_question_bindings(connection: sqlite3.Connection) -> None:
+    # Backups from supported older migrations have neither column. Their absence
+    # is legitimate; partial presence or malformed new input authority is not.
+    columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(agent_run)")}
+    present = {"input_binding_json", "input_binding_sha256"} & columns
+    if not present:
+        return
+    if len(present) != 2:
+        raise BackupIntegrityError("Backup question input schema is incomplete")
+    for row in connection.execute(
+        "SELECT id, case_id, input_binding_json, input_binding_sha256 FROM agent_run"
+    ):
+        try:
+            validate_run_binding(str(row[0]), str(row[1]), row[2], row[3])
+        except AgentValidationError as error:
+            raise BackupIntegrityError("Backup question input binding is invalid") from error
 
 
 def _migration_catalog(connection: sqlite3.Connection) -> tuple[dict[str, object], ...]:
@@ -634,10 +663,16 @@ def _verify_restored_services(database_path: Path, data_root: Path) -> bool:
         before = len(_migration_catalog(connection))
         apply_migrations(connection)
         after = len(_migration_catalog(connection))
+        _verify_question_bindings(connection)
         cases = CaseService(connection).list_workbench_cases()
         for item in cases:
             case_id = item.case.id
             CaseService(connection).get_case(case_id)
+            if item.case.type == "warranty":
+                try:
+                    PreparationIntentService(connection).get(case_id)
+                except PreparationIntentError as error:
+                    raise BackupIntegrityError("Restored preparation intent is invalid") from error
             ClaimService(connection).list_case_claims(case_id)
             DeadlineService(connection).list_case_deadlines(case_id)
             ActionService(connection).list_case_actions(case_id)
@@ -708,10 +743,29 @@ def _verified_data_file(
 
 
 def _open_snapshot(path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True, isolation_level=None)
+    # Encode native separators too: a Windows extended prefix must not become a
+    # URI authority/query, and literal #/% in a directory must remain filename text.
+    connection = sqlite3.connect(
+        f"file:{quote(str(path), safe='/:')}?mode=ro", uri=True, isolation_level=None
+    )
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
+
+
+def _backup_io_path(path: Path) -> Path:
+    """Keep Windows backup work in place without the legacy MAX_PATH restriction."""
+    if os.name != "nt":
+        return path
+    # Normalize before adding the prefix, whose Win32 semantics do not collapse
+    # relative components. Keep every work-root child in the same representation
+    # so existing resolved containment checks and temporary cleanup still apply.
+    value = os.path.abspath(path)
+    if value.startswith("\\\\?\\"):
+        return Path(value)
+    if value.startswith("\\\\"):
+        value = "UNC\\" + value[2:]
+    return Path("\\\\?\\" + value)
 
 
 def _safe_root(path: Path) -> Path:
